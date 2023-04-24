@@ -8,6 +8,7 @@ public class FPSCounter : MonoBehaviour
 {
 
     TMP_Text txt;
+    int frames = 0;
 
     void Awake()
     {
@@ -19,8 +20,14 @@ public class FPSCounter : MonoBehaviour
         InvokeRepeating("framerate", 0.0f, 1.0f);
     }
 
+    void Update()
+    {
+        frames++;
+    }
+
     void framerate()
     {
-        txt.text = string.Format("Framerate: {0}", 1.0f / Time.deltaTime);
+        txt.text = string.Format("Framerate: {0}", frames);
+        frames = 0;
     }
 }

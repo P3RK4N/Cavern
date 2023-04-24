@@ -20,6 +20,10 @@ float steerStrength = 1.0f;
     {
         velocity = Vector2.zero;
         direction = Random.insideUnitCircle;
+
+        int seed = Random.Range(0, 1000000000);
+        Debug.Log(seed);
+        Random.InitState(seed);
     }
 
     // Update is called once per frame
@@ -33,7 +37,7 @@ float steerStrength = 1.0f;
         direction = (direction + Random.insideUnitCircle * wanderStrength).normalized;
 
         Vector2 wantedVelocity = direction * maxSpeed;
-        Vector2 steerVelocity = (direction - velocity) * steerStrength;
+        Vector2 steerVelocity = (wantedVelocity - velocity) * steerStrength;
         Vector2 acceleration = Vector2.ClampMagnitude(steerVelocity, steerStrength);
 
         velocity = Vector2.ClampMagnitude(velocity + acceleration * Time.deltaTime, maxSpeed);
