@@ -58,7 +58,7 @@ public class TextureViewerEditor : Editor
             }
             case TextureViewer.PerlinOffset.ZX:
             {
-                ps.offset = new Vector2(pos.z, pos.x);
+                ps.offset = -new Vector2(pos.z, pos.x);
                 break;
             }
         }
