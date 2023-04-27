@@ -45,6 +45,13 @@ float perceptionPriority = 0.5f;
 [Range(0,1)]
 float foodPriority = 0.5f;
 
+[Space(10)]
+[Header("Pheromones")]
+[SerializeField]
+GameObject pheromoneCollider;
+[SerializeField]
+float pheromoneDelay = 2.0f;
+
     public static readonly int s_ObstacleLayer = 0b100000000;
 
     /* ENEMY STATE */
@@ -64,6 +71,10 @@ float foodPriority = 0.5f;
     Vector2 m_PerceptionDirection   = Vector2.zero;
     bool m_Percepting               = false;
 
+    //Pheromones
+    Transform pheromones            = null;
+    float passedDistance            = 0.0f;
+
 
     /* ENEMY PARTS */
 
@@ -74,6 +85,7 @@ float foodPriority = 0.5f;
     {
         m_Head = transform.Find("Head");
         rb = GetComponent<Rigidbody>();
+        pheromones = new GameObject("Pheromones").transform;
     }
 
     void Start()
@@ -103,7 +115,13 @@ float foodPriority = 0.5f;
         Vector3 velocity3d = new Vector3(m_Velocity.x, 0, m_Velocity.y);
 
         transform.position += velocity3d;
-        // rb.MovePosition(transform.position + velocity3d);
+
+        passedDistance += m_Velocity.magnitude;
+        if(passedDistance >= pheromoneDelay)
+        {
+            passedDistance -= pheromoneDelay;
+            Instantiate(pheromoneCollider, transform.position, Quaternion.identity, pheromones);
+        }
 
         transform.rotation = Quaternion.LookRotation(velocity3d, Vector3.up);
     }
@@ -195,7 +213,6 @@ float foodPriority = 0.5f;
     void OnTriggerEnter(Collider other) 
     {
         Vector3 point = other.ClosestPoint(transform.position);
-        Debug.Log(point);
         Vector3 normal = transform.position - point;
         Debug.DrawRay(point, normal, Color.green, 5);
         transform.position += normal.normalized * 0.1f;

@@ -6,11 +6,15 @@ public class FloorGenerator : MonoBehaviour
 {
     public GameObject cube;
 
+    Transform walls;
+
     TextureViewer tw;
 
     void Awake()
     {
         tw = GetComponent<TextureViewer>();
+        walls = new GameObject("Walls").transform;
+        walls.parent = transform;
     }
 
     void Start()
@@ -40,6 +44,6 @@ public class FloorGenerator : MonoBehaviour
         for(int i = 0; i < perlinNoise.GetLength(0); i++)
             for(int j = 0; j < perlinNoise.GetLength(1); j++)
                 if(perlinNoise[i,j] < 0.01f)
-                    Instantiate(cube, initPos + new Vector3(-j, 0.5f, -i) * scale, Quaternion.identity, transform.parent);
+                    Instantiate(cube, initPos + new Vector3(-j, 0.5f, -i) * scale, Quaternion.identity, walls);
     }
 }
