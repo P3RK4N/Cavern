@@ -22,12 +22,6 @@ public class FloorGenerator : MonoBehaviour
         createEnvironment();
     }
 
-    // Update is called once per frame
-    void Update()
-    {
-        
-    }
-
     void createEnvironment()
     {
         if(tw.seed != 0) Random.InitState(tw.seed);
@@ -37,6 +31,7 @@ public class FloorGenerator : MonoBehaviour
 
         float[,] perlinNoise = Noise.perlinNoise(tw.textureSize.x, tw.textureSize.y, tw.perlinSettings);
         Filter.binarize(perlinNoise, tw.perlinTreshold, 0.0f, 1.0f);
+        Filter.borderize(perlinNoise, 0.0f);
 
         Vector3 initPos = - new Vector3(0.5f, 0, 0.5f) + new Vector3(tw.textureSize.x, 0, tw.textureSize.y) / 2;
         initPos *= scale;

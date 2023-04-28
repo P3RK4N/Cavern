@@ -15,9 +15,9 @@ TagManager:
   - Player
   - Obstacle
   - Food
-  - Particle
-  - 
-  - 
+  - NestPheromone
+  - FoodPheromone
+  - EnemyPheromone
   - 
   - 
   - 
