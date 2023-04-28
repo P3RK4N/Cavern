@@ -12,6 +12,8 @@ public class EnemyMovement : MonoBehaviour
     float f_WanderStrength = 1.0f;
     [SerializeField]
     float f_SteerStrength = 1.0f;
+    [SerializeField]
+    float f_DetectionDistance = 3.0f;
 
     [Space(10)]
     [Header("Obstacles")]
@@ -90,9 +92,10 @@ public class EnemyMovement : MonoBehaviour
     float m_PassedDistance          = 0.0f;
 
     //State
-    EnemyState m_State              = EnemyState.Searching;
+    bool m_Returning                = false;
     Transform m_TargetFood          = null;
     Transform m_TargetPrey          = null;
+    Transform m_TargetNest          = null;
 
     void Awake()
     {
@@ -113,13 +116,70 @@ public class EnemyMovement : MonoBehaviour
         // StartCoroutine("sensePheromoneEnumerator");
     }
 
-    // Update is called once per frame
     void Update()
     {
-        moveWander();
+        detection();
+        behavior();
     }
 
-    void moveWander()
+    /*
+        Detection of Prey, Food and Nest
+        Currently works only with 1 forward ray
+    */
+    void detection()
+    {
+        DebugExtension.DebugArrow(r_TF.position, r_TF.forward * f_DetectionDistance, Color.white, 0.1f);
+    }
+
+    void behavior()
+    {
+        /*
+
+        ##|NEST  RETURNING   FOOD    PREY |  ACTION      PRIORITY |             DESCRIPTION             |
+        __|_______________________________|_______________________|_____________________________________|
+        0 |  0       0         0      0   |  wander         0     | wander;
+        1 |  0       0         0      1   |  fight          4     | fight;
+        2 |  0       0         1      0   |  collect        1     | collect;
+        3 |  0       0         1      1   |  ----         ----    | not happening;  fallback to 1
+        4 |  0       1         0      0   |  ----         ----    | not happening;  fallback to 0
+        5 |  0       1         0      1   |  run away       5     | run away;
+        6 |  0       1         1      0   |  carry          2     | carry;
+        7 |  0       1         1      1   |  ----         ----    | not happening;  fallback to 1
+        8 |  1       0         0      0   |  ----         ----    | not happening;  fallback to 0
+        9 |  1       0         0      1   |  ----         ----    | not happening;  fallback to 1
+        10|  1       0         1      0   |  ----         ----    | not happening;  fallback to 2
+        11|  1       0         1      1   |  ----         ----    | not happening;  fallback to 1
+        12|  1       1         0      0   |  ----         ----    | not happening;  fallback to 0
+        13|  1       1         0      1   |  reset          6     | reset;          transition to 0 or 1
+        14|  1       1         1      0   |  store          3     | store;          transition to 0
+        15|  1       1         1      1   |  ----         ----    | not happening;  fallback to 1
+
+        */
+
+        // Get to nest
+        if(m_Returning && m_TargetNest != null) navigate();
+        //Run away (4,5,~7)
+        if(m_Returning && m_TargetFood == null) wander();
+        //Attack or collect (1,2,~3)
+        else if(!m_Returning && (m_TargetPrey != null || m_TargetFood != null)) navigate();
+        //Wandering (0,6)
+        else wander();
+    }
+
+    void navigate()
+    {
+        if(m_TargetPrey != null)
+        {
+
+        }
+        else
+        {
+
+        }
+    }
+
+    //Regular wandering for now
+    void wander()
     {
         sensePheromone();
 
@@ -145,8 +205,6 @@ public class EnemyMovement : MonoBehaviour
         if(m_Wandering)     newDirection += (m_Direction + Random.insideUnitCircle * f_WanderStrength).normalized * f_WanderPriority;
         if(m_Turning)       newDirection += m_TurnDirection * f_TurnPriority;
         if(m_Percepting)    newDirection += m_PerceptionDirection * f_PerceptionPriority;
-        //TODO: Add Food
-        //TODO: Add enemy
 
         m_Direction = newDirection.normalized;
     }
@@ -187,7 +245,7 @@ public class EnemyMovement : MonoBehaviour
 
         while(true)
         {
-            int layer = m_State == EnemyState.Searching ? Layer.s_Instance.m_ToFoodPheromoneMask : Layer.s_Instance.m_ToNestPheromoneMask;
+            int layer = !m_Returning ? Layer.s_Instance.m_ToFoodPheromoneMask : Layer.s_Instance.m_ToNestPheromoneMask;
 
             Vector3 fwd = r_TF.forward * f_PheromoneSenseDistance;
             m_PerceptionDirection = Vector2.zero;
@@ -233,12 +291,13 @@ public class EnemyMovement : MonoBehaviour
         }
     }
 
+    //Handles both wandering and returning
     void sensePheromone()
     {
         Quaternion offset1 = Quaternion.Euler(0, f_PheromoneSenseOffsetDeg, 0);
         Quaternion offset2 = Quaternion.Inverse(offset1);
 
-        int layer = m_State == EnemyState.Searching ? Layer.s_Instance.m_ToFoodPheromoneMask : Layer.s_Instance.m_ToNestPheromoneMask;
+        int layer = !m_Returning ? Layer.s_Instance.m_ToFoodPheromoneMask : Layer.s_Instance.m_ToNestPheromoneMask;
 
         Vector3 fwd = r_TF.forward * f_PheromoneSenseDistance;
         m_PerceptionDirection = Vector2.zero;
@@ -335,32 +394,30 @@ public class EnemyMovement : MonoBehaviour
         {
             m_PassedDistance -= f_PheromoneDispatchDelay;
             Pheromone p = Instantiate(f_Pheromone, r_TF.position, Quaternion.identity, s_Pheromones).GetComponent<Pheromone>();
-            p.setPheromoneType(m_State == EnemyState.Searching ? PheromoneType.ToNest : PheromoneType.ToFood);
+            p.setPheromoneType(!m_Returning ? PheromoneType.ToNest : PheromoneType.ToFood);
         }
     }
 
     void OnTriggerEnter(Collider other) 
     {
-        Vector3 point = other.ClosestPoint(r_TF.position);
-        Vector3 normal = r_TF.position - point;
+        int layer = other.gameObject.layer;
+        if(layer == Layer.s_Instance.m_ObstacleLayer)
+        {
+            Vector3 point = other.ClosestPoint(r_TF.position);
+            Vector3 normal = r_TF.position - point;
 
 #if UNITY_EDITOR
-        Debug.DrawRay(point, normal, Color.green, 5);
+            Debug.DrawRay(point, normal, Color.green, 5);
 #endif
+            r_TF.position += normal.normalized * 0.1f;
+        }
+        else if(layer == Layer.s_Instance.m_FoodLayer)
+        {
 
-        r_TF.position += normal.normalized * 0.1f;
+        }
+        else if(layer == Layer.s_Instance.m_NestLayer)
+        {
+
+        }
     }
-}
-
-public enum EnemyState
-{
-    Searching   = 0,
-    Returning   = 1,
-    Fighting    = 2,
-}
-
-public enum EnemyMovementType
-{
-    Wandering   = 0,
-    Navigating  = 1,
 }
