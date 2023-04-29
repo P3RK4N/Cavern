@@ -5,10 +5,16 @@ using TMPro;
 
 public class Nest : MonoBehaviour
 {
-    TMP_Text r_TXT;
-    Transform r_Label;
-    Transform r_Camera;
-    Transform r_TF;
+    [SerializeField]
+    GameObject f_Enemy;
+    [SerializeField]
+    int f_EnemyAmount;
+
+    TMP_Text r_TXT      = null;
+    Transform r_Label   = null;
+    Transform r_Camera  = null;
+    Transform r_TF      = null;
+    Transform r_Enemies = null;
 
     int m_Value = 0;
 
@@ -18,12 +24,28 @@ public class Nest : MonoBehaviour
         r_TF = transform;
         r_Label = r_TF.GetChild(0);
         r_Camera = FindObjectOfType<Camera>().transform;
+        r_Enemies = new GameObject("Enemies").transform;
+    }
+
+    void Start()
+    {
+        spawnEnemies();
     }
 
     // Update is called once per frame
     void Update()
     {
         lookToCam();
+    }
+
+    void spawnEnemies()
+    {
+        Transform tf = r_TF.Find("SpawnPoints");
+        int num = tf.childCount;
+        for(int i = 0; i < f_EnemyAmount; i++)
+        {
+            Instantiate(f_Enemy, tf.GetChild(Random.Range(0,num)).position,Quaternion.identity, r_Enemies);
+        }
     }
 
     void lookToCam()
