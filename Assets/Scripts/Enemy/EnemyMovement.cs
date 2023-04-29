@@ -63,9 +63,16 @@ public class EnemyMovement : MonoBehaviour
     [Range(0,1)]
     float f_PerceptionPriority = 0.5f;
 
+    [Space(10)]
+    [Header("Navigation")]
+    [SerializeField]
+    float f_FoodStopDistance = 1.0f;
+    [SerializeField]
+    float f_PreyStopDistance = 1.0f;
+    [SerializeField]
+    float f_NestStopDistance = 1.0f;
 
     static Transform s_Pheromones = null;
-
 
     Transform r_Head;
     Transform r_Body;
@@ -101,7 +108,13 @@ public class EnemyMovement : MonoBehaviour
 
     void Awake()
     {
-        if(s_Pheromones == null) { s_Pheromones = new GameObject("Pheromones").transform; }
+        if(s_Pheromones == null) 
+        { 
+            s_Pheromones = new GameObject("Pheromones").transform;
+            int seed = Random.Range(0, 1000000000);
+            Debug.Log(seed);
+            Random.InitState(seed);
+        }
 
         r_RB = GetComponent<Rigidbody>();
         r_NMA = GetComponent<NavMeshAgent>();
@@ -112,10 +125,6 @@ public class EnemyMovement : MonoBehaviour
 
     void Start()
     {
-        int seed = Random.Range(0, 1000000000);
-        Debug.Log(seed);
-        Random.InitState(seed);
-
         StartCoroutine("senseObstacle");
         // StartCoroutine("sensePheromoneEnumerator");
 
@@ -203,9 +212,9 @@ public class EnemyMovement : MonoBehaviour
                 else
                 {
                     //Impossible ? Frame when runaway is cooled down
-#if UNITY_EDITOR
+                    #if UNITY_EDITOR
                     Debug.Log("Impossible 1");
-#endif
+                    #endif
                     m_Returning = false;
                 }
             }
@@ -256,7 +265,7 @@ public class EnemyMovement : MonoBehaviour
         15.Happens after seeing enemy while state 14 (storing). Falls back to state 1 (fighting)
         */
 
-        if(m_Returning)
+        if(m_Returning && m_TargetNest == null)
         {
             r_NMA.enabled = false;
             wander();
@@ -284,9 +293,21 @@ public class EnemyMovement : MonoBehaviour
             yield return wait;
             if(r_NMA.enabled) 
             {
-                if(m_TargetPrey != null) r_NMA.SetDestination(m_TargetPrey.position);
-                else if(m_TargetFood != null) r_NMA.SetDestination(m_TargetFood.position);
-                else r_NMA.SetDestination(m_TargetNest.position); //Nest
+                if(m_TargetPrey != null) 
+                {
+                    r_NMA.stoppingDistance = f_PreyStopDistance;
+                    r_NMA.SetDestination(m_TargetPrey.position);
+                }
+                else if(m_TargetNest != null)
+                {
+                    r_NMA.stoppingDistance = f_NestStopDistance;
+                    r_NMA.SetDestination(m_TargetNest.position);
+                }
+                else if(m_TargetFood != null) 
+                {
+                    r_NMA.stoppingDistance = f_FoodStopDistance;
+                    r_NMA.SetDestination(m_TargetFood.position);
+                }
             }
         }
     }
@@ -539,7 +560,7 @@ public class EnemyMovement : MonoBehaviour
             #endif
 
             if(m_Returning || m_TargetFood != tf) return;
-
+            //TODO Attach it properly to mouth later
             tf.parent = r_TF;
             tf.GetComponent<Collider>().enabled = false;
             StartCoroutine("turn");
@@ -550,6 +571,26 @@ public class EnemyMovement : MonoBehaviour
             #if UNITY_EDITOR 
                 Debug.Log("Nest hit");
             #endif
+
+            if(!m_Returning) return;
+
+            if(m_TargetPrey != null)
+            {
+                //Everything is now false -> turns around and starts wandering
+                m_Returning = false;
+                m_TargetPrey = null;
+                StartCoroutine("turn");
+            }
+            else //Food
+            {
+                //It brought back food
+                m_TargetNest.GetComponent<Nest>().increment();
+                Destroy(m_TargetFood.gameObject);
+                m_TargetFood = null;
+                m_TargetNest = null;
+                m_Returning = false;
+                StartCoroutine("turn");
+            }
         }
         else if(layer == Layer.s_Instance.m_PlayerLayer)
         {
