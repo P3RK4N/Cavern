@@ -128,42 +128,125 @@ public class EnemyMovement : MonoBehaviour
     */
     void detection()
     {
+        int layer = Layer.s_Instance.m_FoodMask | Layer.s_Instance.m_PlayerMask | Layer.s_Instance.m_NestMask;
+
+#if UNITY_EDITOR
         DebugExtension.DebugArrow(r_TF.position, r_TF.forward * f_DetectionDistance, Color.white, 0.1f);
+#endif
+
+        RaycastHit hit;
+        Ray ray = new Ray(r_TF.position, r_TF.forward);
+        if(Physics.Raycast(ray, out hit, f_DetectionDistance, layer))
+        {
+            int hitLayer = hit.collider.gameObject.layer;
+            Transform tf = hit.collider.transform;
+            
+            if(hitLayer == Layer.s_Instance.m_FoodLayer)
+            {
+                //Either fighting, running away, collecting, carrying, storing
+                if(m_TargetPrey != null || m_TargetFood != null) return; //Maybe add if returning to return too; redundant?
+                m_TargetFood = tf;
+            }
+            else if(hitLayer == Layer.s_Instance.m_PlayerLayer)
+            {
+                //Either already fights or runs away from enemy
+                if(m_TargetPrey != null) return;
+
+                //Either finished running away, was collecting, was carrying, was storing, was roaming
+                //Drops food, starts fight
+                m_Returning = false;
+                m_TargetFood.parent = null;
+                m_TargetFood = null;
+                m_TargetNest = null;
+
+#if UNITY_EDITOR
+                Debug.Log("Prey: " + hit.collider.name);
+#endif
+                m_TargetPrey = tf;
+            }
+            else //Nest
+            {
+                //Ignore if not returning
+                if(!m_Returning) return;
+
+                //Happens when running away or fighting -> reset to fight or wander
+                if(m_TargetPrey != null)
+                {
+                    //Everything is now false -> turns around and starts wandering
+                    m_Returning = false;
+                    m_TargetPrey = null;
+                    StartCoroutine("turn");
+                }
+                else if(m_TargetFood != null)
+                {
+                    //Starts navigating to nest
+                    m_TargetNest = tf;
+                }
+                else
+                {
+                    //Impossible ? Frame when runaway is cooled down
+#if UNITY_EDITOR
+                    Debug.Log("Impossible 1");
+#endif
+                    m_Returning = false;
+                }
+            }
+        }
     }
 
     void behavior()
     {
         /*
 
-        ##|NEST  RETURNING   FOOD    PREY |  ACTION      PRIORITY |             DESCRIPTION             |
-        __|_______________________________|_______________________|_____________________________________|
-        0 |  0       0         0      0   |  wander         0     | wander;
-        1 |  0       0         0      1   |  fight          4     | fight;
-        2 |  0       0         1      0   |  collect        1     | collect;
-        3 |  0       0         1      1   |  ----         ----    | not happening;  fallback to 1
-        4 |  0       1         0      0   |  ----         ----    | not happening;  fallback to 0
-        5 |  0       1         0      1   |  run away       5     | run away;
-        6 |  0       1         1      0   |  carry          2     | carry;
-        7 |  0       1         1      1   |  ----         ----    | not happening;  fallback to 1
-        8 |  1       0         0      0   |  ----         ----    | not happening;  fallback to 0
-        9 |  1       0         0      1   |  ----         ----    | not happening;  fallback to 1
-        10|  1       0         1      0   |  ----         ----    | not happening;  fallback to 2
-        11|  1       0         1      1   |  ----         ----    | not happening;  fallback to 1
-        12|  1       1         0      0   |  ----         ----    | not happening;  fallback to 0
-        13|  1       1         0      1   |  reset          6     | reset;          transition to 0 or 1
-        14|  1       1         1      0   |  store          3     | store;          transition to 0
-        15|  1       1         1      1   |  ----         ----    | not happening;  fallback to 1
+        ---------------------------------------------------------------------------------------------------
+        |##|NEST  RETURNING   FOOD    PREY |  ACTION      PRIORITY |             DESCRIPTION              |
+        |__|_______________________________|_______________________|______________________________________|
+        | 0|  0       0         0      0   |  wander         0     | wander;                              |
+        | 1|  0       0         0      1   |  fight          4     | fight;                               |
+        | 2|  0       0         1      0   |  collect        1     | collect;                             |
+        | 3|  0       0         1      1   |  ----         ----    | not happening;  fallback to 1        |
+        | 4|  0       1         0      0   |  ----         ----    | not happening;  fallback to 0        |
+        | 5|  0       1         0      1   |  run away       5     | run away;                            |
+        | 6|  0       1         1      0   |  carry          2     | carry;                               |
+        | 7|  0       1         1      1   |  ----         ----    | not happening;  fallback to 1        |
+        | 8|  1       0         0      0   |  ----         ----    | not happening;  fallback to 0        |
+        | 9|  1       0         0      1   |  ----         ----    | not happening;  fallback to 1        |
+        |10|  1       0         1      0   |  ----         ----    | not happening;  fallback to 2        |
+        |11|  1       0         1      1   |  ----         ----    | not happening;  fallback to 1        |
+        |12|  1       1         0      0   |  ----         ----    | not happening;  fallback to 0        |
+        |13|  1       1         0      1   |  reset          6     | reset;          transition to 0 or 1 |
+        |14|  1       1         1      0   |  store          3     | store;          transition to 0      |
+        |15|  1       1         1      1   |  ----         ----    | not happening;  fallback to 1        |
+        ---------------------------------------------------------------------------------------------------
 
+        VERBOSE:
+        0. Default free roaming action. Moves randomly and reacts to food pheromones, food and prey
+        1. Happens during or after any action with lower priority. Moves with navigation to prey
+        2. Happens during or after any action with lower priority. Moves with navigation to food
+        3. Doesnt happen - during state 2 (collection) it falls back to state 1 (fighting) after spotting prey
+        4. Doesnt happen - after runaway cooldown it falls back to state 0 (wandering)
+        5. Happens randomly when health drops. Moves randomly and reacts to nest pheromones
+        6. Happens only after state 2 (collection). Moves randomly and reacts to nest pheromones and prey
+        7. Doesnt happen - during state 6 (carrying) it falls back to state 1 (fighting) after spotting prey
+        8. Doesnt happen - seeing nest during wandering falls again to state 0 (wandering)
+        9. Doesnt happen - cannot see nest and enemy in the same frame
+        10.Doesnt happen - cannot see nest and food in the same frame
+        11.Doesnt happen - cannot see nest and food and prey in the same frame
+        12.Doesnt happen - frame where runaway cooldown and seeing nest happen. Falls back to state 0 (wandering)
+        13.~~~Happens after seeing nest while runaway is active. Falls back to state 0 (wandering) or state 1 (fighting)
+        14.Happens after seeing nest while state 6 (carrying). Moves with navigation to nest
+        15.Happens after seeing enemy while state 14 (storing). Falls back to state 1 (fighting)
         */
 
-        // Get to nest
-        if(m_Returning && m_TargetNest != null) navigate();
-        //Run away (4,5,~7)
-        if(m_Returning && m_TargetFood == null) wander();
-        //Attack or collect (1,2,~3)
-        else if(!m_Returning && (m_TargetPrey != null || m_TargetFood != null)) navigate();
-        //Wandering (0,6)
-        else wander();
+        // // Get to nest
+        // if(m_Returning && m_TargetNest != null) navigate();
+        // //Run away (4,5,~7)
+        // if(m_Returning && m_TargetFood == null) wander();
+        // //Attack or collect (1,2,~3)
+        // else if(!m_Returning && (m_TargetPrey != null || m_TargetFood != null)) navigate();
+        // //Wandering (0,6)
+        // else 
+        wander();
     }
 
     void navigate()
@@ -339,6 +422,8 @@ public class EnemyMovement : MonoBehaviour
 
     IEnumerator turn()
     {
+        if(m_Turning) yield break;
+
         m_Turning = true;
         f_SteerStrength *= 1.5f;
 
