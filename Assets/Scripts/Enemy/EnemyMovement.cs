@@ -2,6 +2,8 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Events;
+using Unity.AI.Navigation;
+using UnityEngine.AI;
 
 public class EnemyMovement : MonoBehaviour
 {
@@ -69,6 +71,7 @@ public class EnemyMovement : MonoBehaviour
     Transform r_Body;
     Transform r_TF;
     Rigidbody r_RB;
+    NavMeshAgent r_NMA;
 
 
     //Physics stats
@@ -87,6 +90,7 @@ public class EnemyMovement : MonoBehaviour
     bool m_Percepting               = true;
 
     //Pheromones
+    bool m_Dispatching              = true;
     float m_PassedDistance          = 0.0f;
 
     //State
@@ -100,6 +104,7 @@ public class EnemyMovement : MonoBehaviour
         if(s_Pheromones == null) { s_Pheromones = new GameObject("Pheromones").transform; }
 
         r_RB = GetComponent<Rigidbody>();
+        r_NMA = GetComponent<NavMeshAgent>();
         r_TF = transform;
         r_Head = r_TF.Find("Head");
         r_Body = r_TF.Find("Body");
@@ -113,6 +118,8 @@ public class EnemyMovement : MonoBehaviour
 
         StartCoroutine("senseObstacle");
         // StartCoroutine("sensePheromoneEnumerator");
+
+        StartCoroutine("navigate");
     }
 
     void Update()
@@ -130,11 +137,11 @@ public class EnemyMovement : MonoBehaviour
         int layer = Layer.s_Instance.m_FoodMask | Layer.s_Instance.m_PlayerMask | Layer.s_Instance.m_NestMask;
 
 #if UNITY_EDITOR
-        DebugExtension.DebugArrow(r_Body.position, r_Body.forward * f_DetectionDistance, Color.white, 0.1f);
+        DebugExtension.DebugArrow(r_TF.position, r_TF.forward * f_DetectionDistance, Color.white, 0.1f);
 #endif
 
         RaycastHit hit;
-        Ray ray = new Ray(r_Body.position, r_Body.forward);
+        Ray ray = new Ray(r_TF.position, r_TF.forward);
         if(Physics.Raycast(ray, out hit, f_DetectionDistance, layer))
         {
             int hitLayer = hit.collider.gameObject.layer;
@@ -142,12 +149,20 @@ public class EnemyMovement : MonoBehaviour
             
             if(hitLayer == Layer.s_Instance.m_FoodLayer)
             {
+                #if UNITY_EDITOR 
+                    Debug.Log("FoodDetected");
+                #endif
+
                 //Either fighting, running away, collecting, carrying, storing
                 if(m_TargetPrey != null || m_TargetFood != null) return; //Maybe add if returning to return too; redundant?
                 m_TargetFood = tf;
             }
             else if(hitLayer == Layer.s_Instance.m_PlayerLayer)
             {
+                #if UNITY_EDITOR 
+                    Debug.Log("PlayerDetected");
+                #endif
+                
                 //Either already fights or runs away from enemy
                 if(m_TargetPrey != null) return;
 
@@ -156,6 +171,7 @@ public class EnemyMovement : MonoBehaviour
                 if(m_TargetFood)
                 {
                     m_TargetFood.parent = null;
+                    m_TargetFood.GetComponent<Collider>().enabled = true;
                     m_TargetFood = null;
                 }
                 m_Returning = false;
@@ -164,6 +180,10 @@ public class EnemyMovement : MonoBehaviour
             }
             else //Nest
             {
+                #if UNITY_EDITOR 
+                    Debug.Log("NestDetected");
+                #endif
+                
                 //Ignore if not returning
                 if(!m_Returning) return;
 
@@ -236,20 +256,38 @@ public class EnemyMovement : MonoBehaviour
         15.Happens after seeing enemy while state 14 (storing). Falls back to state 1 (fighting)
         */
 
+        if(m_Returning)
+        {
+            r_NMA.enabled = false;
+            wander();
+        }
+        else if(m_TargetFood != null || m_TargetPrey != null || m_TargetNest != null)
+        {
+            r_NMA.enabled = true;
+        }
+        else
+        {
+            r_NMA.enabled = false;
+            wander();
+        }
 
+        if(m_Dispatching) dispatchPheromone();
     }
 
 #region NAVIGATING
 
-    void navigate()
+    IEnumerator navigate()
     {
-        if(m_TargetPrey != null)
+        WaitForSeconds wait = new WaitForSeconds(1.0f);
+        while(true)
         {
-
-        }
-        else
-        {
-
+            yield return wait;
+            if(r_NMA.enabled) 
+            {
+                if(m_TargetPrey != null) r_NMA.SetDestination(m_TargetPrey.position);
+                else if(m_TargetFood != null) r_NMA.SetDestination(m_TargetFood.position);
+                else r_NMA.SetDestination(m_TargetNest.position); //Nest
+            }
         }
     }
 
@@ -271,10 +309,8 @@ public class EnemyMovement : MonoBehaviour
         m_Velocity = Vector2.ClampMagnitude(m_Velocity + acceleration * Time.deltaTime, f_MaxSpeed);
         Vector3 velocity3d = new Vector3(m_Velocity.x, 0, m_Velocity.y);
 
-        r_Body.position += velocity3d;
-        r_Body.rotation = Quaternion.LookRotation(velocity3d, Vector3.up);
-
-        dispatchPheromone();
+        r_TF.position += velocity3d;
+        r_TF.rotation = Quaternion.LookRotation(velocity3d, Vector3.up);
     }
 
     void calculateDirection()
@@ -326,7 +362,7 @@ public class EnemyMovement : MonoBehaviour
         {
             int layer = !m_Returning ? Layer.s_Instance.m_ToFoodPheromoneMask : Layer.s_Instance.m_ToNestPheromoneMask;
 
-            Vector3 fwd = r_Body.forward * f_PheromoneSenseDistance;
+            Vector3 fwd = r_TF.forward * f_PheromoneSenseDistance;
             m_PerceptionDirection = Vector2.zero;
             
             int maxVisited = 0;
@@ -334,7 +370,7 @@ public class EnemyMovement : MonoBehaviour
             
             //Left
             Vector3 vec = offset1 * fwd;
-            if((curr = Physics.OverlapSphere(r_Body.position + vec, f_PheromoneSenseRadius, layer).Length) > maxVisited)
+            if((curr = Physics.OverlapSphere(r_TF.position + vec, f_PheromoneSenseRadius, layer).Length) > maxVisited)
             {
                 maxVisited = curr;
                 m_PerceptionDirection = new Vector2(vec.x, vec.z);
@@ -342,7 +378,7 @@ public class EnemyMovement : MonoBehaviour
 
             //Forward
             vec = fwd;
-            if((curr = Physics.OverlapSphere(r_Body.position + vec, f_PheromoneSenseRadius, layer).Length) > maxVisited)
+            if((curr = Physics.OverlapSphere(r_TF.position + vec, f_PheromoneSenseRadius, layer).Length) > maxVisited)
             {
                 maxVisited = curr;
                 m_PerceptionDirection = new Vector2(vec.x, vec.z);
@@ -350,7 +386,7 @@ public class EnemyMovement : MonoBehaviour
 
             //Right
             vec = offset2 * fwd;
-            if((curr = Physics.OverlapSphere(r_Body.position + vec, f_PheromoneSenseRadius, layer).Length) > maxVisited)
+            if((curr = Physics.OverlapSphere(r_TF.position + vec, f_PheromoneSenseRadius, layer).Length) > maxVisited)
             {
                 maxVisited = curr;
                 m_PerceptionDirection = new Vector2(vec.x, vec.z);
@@ -359,11 +395,11 @@ public class EnemyMovement : MonoBehaviour
             m_PerceptionDirection.Normalize();
 
 #if UNITY_EDITOR
-            DebugExtension.DebugWireSphere(r_Body.position + offset1 * fwd, Color.magenta, f_PheromoneSenseRadius, 1.0f);
-            DebugExtension.DebugWireSphere(r_Body.position + offset2 * fwd, Color.magenta, f_PheromoneSenseRadius, 1.0f);
-            DebugExtension.DebugWireSphere(r_Body.position + fwd, Color.magenta, f_PheromoneSenseRadius, 1.0f);
+            DebugExtension.DebugWireSphere(r_TF.position + offset1 * fwd, Color.magenta, f_PheromoneSenseRadius, 1.0f);
+            DebugExtension.DebugWireSphere(r_TF.position + offset2 * fwd, Color.magenta, f_PheromoneSenseRadius, 1.0f);
+            DebugExtension.DebugWireSphere(r_TF.position + fwd, Color.magenta, f_PheromoneSenseRadius, 1.0f);
             vec = new Vector3(m_PerceptionDirection.x, 0, m_PerceptionDirection.y);
-            DebugExtension.DebugArrow(r_Body.position, vec * 2, Color.cyan, 3.0f);
+            DebugExtension.DebugArrow(r_TF.position, vec * 2, Color.cyan, 3.0f);
 #endif
 
             yield return new WaitForSeconds(f_PheromoneSenseDelaySec);
@@ -378,7 +414,7 @@ public class EnemyMovement : MonoBehaviour
 
         int layer = !m_Returning ? Layer.s_Instance.m_ToFoodPheromoneMask : Layer.s_Instance.m_ToNestPheromoneMask;
 
-        Vector3 fwd = r_Body.forward * f_PheromoneSenseDistance;
+        Vector3 fwd = r_TF.forward * f_PheromoneSenseDistance;
         m_PerceptionDirection = Vector2.zero;
         
         int maxVisited = 0;
@@ -386,7 +422,7 @@ public class EnemyMovement : MonoBehaviour
         
         //Left
         Vector3 vec = offset1 * fwd;
-        if((curr = Physics.OverlapSphere(r_Body.position + vec, f_PheromoneSenseRadius, layer).Length) > maxVisited)
+        if((curr = Physics.OverlapSphere(r_TF.position + vec, f_PheromoneSenseRadius, layer).Length) > maxVisited)
         {
             maxVisited = curr;
             m_PerceptionDirection = new Vector2(vec.x, vec.z);
@@ -394,7 +430,7 @@ public class EnemyMovement : MonoBehaviour
 
         //Forward
         vec = fwd;
-        if((curr = Physics.OverlapSphere(r_Body.position + vec, f_PheromoneSenseRadius, layer).Length) > maxVisited)
+        if((curr = Physics.OverlapSphere(r_TF.position + vec, f_PheromoneSenseRadius, layer).Length) > maxVisited)
         {
             maxVisited = curr;
             m_PerceptionDirection = new Vector2(vec.x, vec.z);
@@ -402,7 +438,7 @@ public class EnemyMovement : MonoBehaviour
 
         //Right
         vec = offset2 * fwd;
-        if((curr = Physics.OverlapSphere(r_Body.position + vec, f_PheromoneSenseRadius, layer).Length) > maxVisited)
+        if((curr = Physics.OverlapSphere(r_TF.position + vec, f_PheromoneSenseRadius, layer).Length) > maxVisited)
         {
             maxVisited = curr;
             m_PerceptionDirection = new Vector2(vec.x, vec.z);
@@ -412,7 +448,7 @@ public class EnemyMovement : MonoBehaviour
 
 #if UNITY_EDITOR
         vec = new Vector3(m_PerceptionDirection.x, 0, m_PerceptionDirection.y);
-        DebugExtension.DebugArrow(r_Body.position, vec * 2, Color.cyan, 0.2f);
+        DebugExtension.DebugArrow(r_TF.position, vec * 2, Color.cyan, 0.2f);
 #endif
     }
 
@@ -440,13 +476,13 @@ public class EnemyMovement : MonoBehaviour
         RaycastHit hit;
         while(tries-- > 0)
         {
-            Vector3 turnDir = Quaternion.Euler(0,Random.Range(-f_MaxTurnaroundOffsetDeg, f_MaxTurnaroundOffsetDeg), 0) * -r_Body.forward;
-            Ray ray = new Ray(r_Body.position, turnDir);
+            Vector3 turnDir = Quaternion.Euler(0,Random.Range(-f_MaxTurnaroundOffsetDeg, f_MaxTurnaroundOffsetDeg), 0) * -r_TF.forward;
+            Ray ray = new Ray(r_TF.position, turnDir);
             
             bool hasHit = Physics.Raycast(ray, out hit, f_TurnObstacleMinDistance, Layer.s_Instance.m_ObstacleMask);
             
 #if UNITY_EDITOR
-            DebugExtension.DebugArrow(r_Body.position, turnDir * 2, Color.gray, 5.0f);
+            DebugExtension.DebugArrow(r_TF.position, turnDir * 2, Color.gray, 5.0f);
 #endif
 
             if(!hasHit)
@@ -462,7 +498,7 @@ public class EnemyMovement : MonoBehaviour
         }
 
 #if UNITY_EDITOR
-        DebugExtension.DebugArrow(r_Body.position, furthestVec * 2, Color.magenta, 5.0f);
+        DebugExtension.DebugArrow(r_TF.position, furthestVec * 2, Color.magenta, 5.0f);
 #endif
 
         return new Vector2(furthestVec.x, furthestVec.z);
@@ -470,11 +506,11 @@ public class EnemyMovement : MonoBehaviour
 
     void dispatchPheromone()
     {
-        m_PassedDistance += m_Velocity.magnitude;
+        m_PassedDistance += !r_NMA.enabled ? m_Velocity.magnitude : r_NMA.velocity.magnitude*Time.deltaTime;
         if(m_PassedDistance >= f_PheromoneDispatchDelay)
         {
             m_PassedDistance -= f_PheromoneDispatchDelay;
-            Pheromone p = Instantiate(f_Pheromone, r_Body.position, Quaternion.identity, s_Pheromones).GetComponent<Pheromone>();
+            Pheromone p = Instantiate(f_Pheromone, r_TF.position, Quaternion.identity, s_Pheromones).GetComponent<Pheromone>();
             p.setPheromoneType(!m_Returning ? PheromoneType.ToNest : PheromoneType.ToFood);
         }
     }
@@ -484,23 +520,44 @@ public class EnemyMovement : MonoBehaviour
     void OnTriggerEnter(Collider other) 
     {
         int layer = other.gameObject.layer;
+        Transform tf = other.transform;
+
         if(layer == Layer.s_Instance.m_ObstacleLayer)
         {
-            Vector3 point = other.ClosestPoint(r_Body.position);
-            Vector3 normal = r_Body.position - point;
+            #if UNITY_EDITOR 
+                Debug.Log("Obstacle hit");
+            #endif
 
-#if UNITY_EDITOR
-            Debug.DrawRay(point, normal, Color.green, 5);
-#endif
-            r_Body.position += normal.normalized * 0.1f;
+            Vector3 point = other.ClosestPoint(r_TF.position);
+            Vector3 normal = r_TF.position - point;
+            r_TF.position += normal.normalized * 0.1f;
         }
         else if(layer == Layer.s_Instance.m_FoodLayer)
         {
+            #if UNITY_EDITOR 
+                Debug.Log("Food hit");
+            #endif
 
+            if(m_Returning || m_TargetFood != tf) return;
+
+            tf.parent = r_TF;
+            tf.GetComponent<Collider>().enabled = false;
+            StartCoroutine("turn");
+            m_Returning = true;
         }
         else if(layer == Layer.s_Instance.m_NestLayer)
         {
+            #if UNITY_EDITOR 
+                Debug.Log("Nest hit");
+            #endif
+        }
+        else if(layer == Layer.s_Instance.m_PlayerLayer)
+        {
+            #if UNITY_EDITOR 
+                Debug.Log("Player hit");
+            #endif
 
+            m_Dispatching = false;
         }
     }
 }
