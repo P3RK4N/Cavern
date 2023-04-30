@@ -106,6 +106,9 @@ public class EnemyMovement : MonoBehaviour
     Transform m_TargetPrey          = null;
     Transform m_TargetNest          = null;
 
+    public bool m_Moving            = true;
+    //TODO Optimize by player distance, jobs, burst, ecs
+
     void Awake()
     {
         if(s_Pheromones == null) 
@@ -119,8 +122,8 @@ public class EnemyMovement : MonoBehaviour
         r_RB = GetComponent<Rigidbody>();
         r_NMA = GetComponent<NavMeshAgent>();
         r_TF = transform;
-        r_Head = r_TF.Find("Head");
-        r_Body = r_TF.Find("Body");
+        r_Head = r_TF.Find("Parts/Head");
+        r_Body = r_TF.Find("Parts/Body");
     }
 
     void Start()
@@ -133,13 +136,18 @@ public class EnemyMovement : MonoBehaviour
 
     void Update()
     {
-        detection();
-        behavior();
+        if(m_Moving)
+        {
+            detection();
+            behavior();
+        }
     }
 
     /*
         Detection of Prey, Food and Nest
         Currently works only with 1 forward ray
+
+        TODO Detect when other enemy took it before this one
     */
     void detection()
     {
@@ -287,16 +295,20 @@ public class EnemyMovement : MonoBehaviour
 
     IEnumerator navigate()
     {
-        WaitForSeconds wait = new WaitForSeconds(1.0f);
+        WaitForSeconds wait = new WaitForSeconds(0.2f);
+        WaitForEndOfFrame wait2 = new WaitForEndOfFrame();
         while(true)
         {
-            yield return wait;
+            yield return wait2;
             if(r_NMA.enabled) 
             {
                 if(m_TargetPrey != null) 
                 {
+                    //TODO Check if prey exits vision
                     r_NMA.stoppingDistance = f_PreyStopDistance;
                     r_NMA.SetDestination(m_TargetPrey.position);
+                    if(Vector3.SqrMagnitude(r_TF.position - m_TargetPrey.position) < 5.0f)
+                        smoothRotateTowards(m_TargetPrey, 360.0f);
                 }
                 else if(m_TargetNest != null)
                 {
@@ -310,6 +322,11 @@ public class EnemyMovement : MonoBehaviour
                 }
             }
         }
+    }
+
+    void smoothRotateTowards(Transform tf, float deg)
+    {
+        r_TF.rotation = Quaternion.RotateTowards(r_TF.rotation, Quaternion.LookRotation(tf.position - r_TF.position), deg * Time.deltaTime);
     }
 
 #endregion
@@ -352,17 +369,19 @@ public class EnemyMovement : MonoBehaviour
             if(!m_Turning)
             {
                 bool hit = false;
+                int mask = Layer.s_Instance.m_ObstacleMask;
+                if(!m_Returning) mask |= Layer.s_Instance.m_NestMask; //TODO If enemy can passthru nest, remove
 
                 //Left
                 {
-                    hit |= Physics.Raycast(r_Head.position, r_Head.forward - r_Head.right * f_ObstacleSenseOffset, f_ObstacleSenseDistance, Layer.s_Instance.m_ObstacleMask);
+                    hit |= Physics.Raycast(r_Head.position, r_Head.forward - r_Head.right * f_ObstacleSenseOffset, f_ObstacleSenseDistance, mask);
 #if UNITY_EDITOR
                     Debug.DrawRay(r_Head.position, r_Head.forward - r_Head.right * f_ObstacleSenseOffset, hit ? Color.red : Color.green, 1.0f);
 #endif
                 }
                 //Right
                 {
-                    hit |= Physics.Raycast(r_Head.position, r_Head.forward + r_Head.right * f_ObstacleSenseOffset, f_ObstacleSenseDistance, Layer.s_Instance.m_ObstacleMask);
+                    hit |= Physics.Raycast(r_Head.position, r_Head.forward + r_Head.right * f_ObstacleSenseOffset, f_ObstacleSenseDistance, mask);
 #if UNITY_EDITOR
                     Debug.DrawRay(r_Head.position, r_Head.forward + r_Head.right * f_ObstacleSenseOffset, hit ? Color.red : Color.green, 1.0f);
 #endif
@@ -564,6 +583,7 @@ public class EnemyMovement : MonoBehaviour
             tf.parent = r_TF;
             tf.GetComponent<Collider>().enabled = false;
             StartCoroutine("turn");
+            m_Velocity = r_NMA.velocity;
             m_Returning = true;
         }
         else if(layer == Layer.s_Instance.m_NestLayer)
@@ -572,9 +592,13 @@ public class EnemyMovement : MonoBehaviour
                 Debug.Log("Nest hit");
             #endif
 
-            if(!m_Returning) return;
-
-            if(m_TargetPrey != null)
+            if(!m_Returning) //TODO if enemy can passthru nest, remove
+            {
+                Vector3 point = other.ClosestPoint(r_TF.position);
+                Vector3 normal = r_TF.position - point;
+                r_TF.position += normal.normalized * 0.1f;
+            }
+            else if(m_TargetPrey != null)
             {
                 //Everything is now false -> turns around and starts wandering
                 m_Returning = false;
@@ -589,6 +613,7 @@ public class EnemyMovement : MonoBehaviour
                 m_TargetFood = null;
                 m_TargetNest = null;
                 m_Returning = false;
+                m_Velocity = r_NMA.velocity;
                 StartCoroutine("turn");
             }
         }
