@@ -102,9 +102,9 @@ public class EnemyMovement : MonoBehaviour
 
     //State
     bool m_Returning                = false;
-    Transform m_TargetFood          = null;
-    Transform m_TargetPrey          = null;
-    Transform m_TargetNest          = null;
+    public Transform m_TargetFood   { get; private set; } = null;
+    public Transform m_TargetPrey   { get; private set; } = null;
+    public Transform m_TargetNest   { get; private set; } = null;
 
     public bool m_Moving            = true;
     //TODO Optimize by player distance, jobs, burst, ecs
@@ -557,6 +557,7 @@ public class EnemyMovement : MonoBehaviour
 
 #endregion
 
+    //TODO Move to EnemyCollision
     void OnTriggerEnter(Collider other) 
     {
         int layer = other.gameObject.layer;

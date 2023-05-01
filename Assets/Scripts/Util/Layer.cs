@@ -16,6 +16,8 @@ public class Layer : MonoBehaviour
     public int m_ToFoodPheromoneMask    { get; private set; }
     public int m_ToEnemyPheromoneMask   { get; private set; }
     public int m_EnemyHitboxMask        { get; private set; }
+    public int m_PlayerHitboxMask       { get; private set; }
+    public int m_TurretMask             { get; private set; }
 
     public int m_GroundLayer            { get; private set; }
     public int m_EnemyLayer             { get; private set; }
@@ -27,6 +29,8 @@ public class Layer : MonoBehaviour
     public int m_ToFoodPheromoneLayer   { get; private set; }
     public int m_ToEnemyPheromoneLayer  { get; private set; }
     public int m_EnemyHitboxLayer       { get; private set; }
+    public int m_PlayerHitboxLayer       { get; private set; }
+    public int m_TurretLayer            { get; private set; }
 
     void Awake()
     {
@@ -50,6 +54,8 @@ public class Layer : MonoBehaviour
         m_ToFoodPheromoneMask = LayerMask.GetMask("FoodPheromone");
         m_ToEnemyPheromoneMask = LayerMask.GetMask("EnemyPheromone");
         m_EnemyHitboxMask = LayerMask.GetMask("EnemyHitbox");
+        m_PlayerHitboxMask = LayerMask.GetMask("PlayerHitbox");
+        m_TurretMask = LayerMask.GetMask("Turret");
 
         m_GroundLayer = LayerMask.NameToLayer("Ground");
         m_EnemyLayer = LayerMask.NameToLayer("Enemy");
@@ -61,5 +67,7 @@ public class Layer : MonoBehaviour
         m_ToFoodPheromoneLayer = LayerMask.NameToLayer("FoodPheromone");
         m_ToEnemyPheromoneLayer = LayerMask.NameToLayer("EnemyPheromone");
         m_EnemyHitboxLayer = LayerMask.NameToLayer("EnemyHitbox");
+        m_PlayerHitboxLayer = LayerMask.NameToLayer("PlayerHitbox");
+        m_TurretLayer = LayerMask.NameToLayer("Turret");
     }
 }

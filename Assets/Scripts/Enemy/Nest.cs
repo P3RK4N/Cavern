@@ -10,11 +10,12 @@ public class Nest : MonoBehaviour
     [SerializeField]
     int f_EnemyAmount;
 
-    TMP_Text r_TXT      = null;
-    Transform r_Label   = null;
-    Transform r_Camera  = null;
-    Transform r_TF      = null;
-    Transform r_Enemies = null;
+    TMP_Text r_TXT          = null;
+    Transform r_Label       = null;
+    Transform r_Camera      = null;
+    Transform r_TF          = null;
+    Transform r_Enemies     = null;
+    Transform r_SpawnPoints = null;
 
     int m_Value = 0;
 
@@ -25,6 +26,7 @@ public class Nest : MonoBehaviour
         r_Label = r_TF.GetChild(0);
         r_Camera = FindObjectOfType<Camera>().transform;
         r_Enemies = new GameObject("Enemies").transform;
+        r_SpawnPoints = r_TF.Find("SpawnPoints");
     }
 
     void Start()
@@ -40,11 +42,21 @@ public class Nest : MonoBehaviour
 
     void spawnEnemies()
     {
-        Transform tf = r_TF.Find("SpawnPoints");
-        int num = tf.childCount;
+        int num = r_SpawnPoints.childCount;
         for(int i = 0; i < f_EnemyAmount; i++)
         {
-            Instantiate(f_Enemy, tf.GetChild(Random.Range(0,num)).position,Quaternion.identity, r_Enemies);
+            Instantiate(f_Enemy, r_SpawnPoints.GetChild(Random.Range(0,num)).position,Quaternion.identity, r_Enemies);
+        }
+    }
+
+    IEnumerator respawnEnemies()
+    {
+        WaitForSeconds wait = new WaitForSeconds(5.0f);
+        while(true)
+        {
+            yield return wait;
+            if(r_Enemies.childCount < f_EnemyAmount)
+                Instantiate(f_Enemy, r_SpawnPoints.GetChild(Random.Range(0,r_SpawnPoints.childCount)).position,Quaternion.identity, r_Enemies);
         }
     }
 

@@ -258,7 +258,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 4824453128222803406}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: 0, y: 1, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -282,6 +282,8 @@ GameObject:
   - component: {fileID: 4065946385506288450}
   - component: {fileID: 372260583314238960}
   - component: {fileID: 2006171398113647368}
+  - component: {fileID: 3631168598650479667}
+  - component: {fileID: 956401975016355158}
   m_Layer: 13
   m_Name: Nest
   m_TagString: Untagged
@@ -304,7 +306,7 @@ Transform:
   - {fileID: 1397942555322402679}
   - {fileID: 4494422895654528817}
   m_Father: {fileID: 0}
-  m_RootOrder: 9
+  m_RootOrder: 8
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!33 &1168813838238889595
 MeshFilter:
@@ -369,14 +371,14 @@ CapsuleCollider:
     m_Bits: 0
   m_ExcludeLayers:
     serializedVersion: 2
-    m_Bits: 0
+    m_Bits: 128
   m_LayerOverridePriority: 0
   m_IsTrigger: 0
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 2
-  m_Radius: 0.62
-  m_Height: 2
+  m_Radius: 0.8
+  m_Height: 10.39
   m_Direction: 1
   m_Center: {x: 0, y: 0, z: 0}
 --- !u!114 &2006171398113647368
@@ -391,6 +393,50 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 475fbc07efb9f9b4889964c20092f6b7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  f_Enemy: {fileID: 2980978002821253523, guid: 87d696d8790831e42b773d0045228611, type: 3}
+  f_EnemyAmount: 5
+--- !u!136 &3631168598650479667
+CapsuleCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6104983937281568541}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 2
+  m_Radius: 0.5
+  m_Height: 6.63
+  m_Direction: 1
+  m_Center: {x: 0, y: 0, z: 0}
+--- !u!114 &956401975016355158
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6104983937281568541}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1e3fdca004f2d45fe8abbed571a8abd5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_OverrideArea: 1
+  m_Area: 1
+  m_OverrideGenerateLinks: 0
+  m_GenerateLinks: 0
+  m_IgnoreFromBuild: 0
+  m_ApplyToChildren: 1
+  m_AffectedAgents: ffffffff
 --- !u!1 &6770984932815990762
 GameObject:
   m_ObjectHideFlags: 0
