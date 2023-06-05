@@ -46,6 +46,6 @@ public PerlinOffset perlinOffset;
 
     public void refresh()
     {
-        mat.SetTexture("_BaseMap", m_Texture);
+        if(mat) mat.SetTexture("_BaseMap", m_Texture);
     }
 }

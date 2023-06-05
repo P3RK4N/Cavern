@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 public static class Noise
@@ -17,8 +18,65 @@ public static class Noise
         public float persistence;
         [SerializeField]
         public float lacunarity;
+
+        public PerlinSettings(PerlinSettings other)
+        {
+            offset = other.offset;
+            scale = other.scale;
+            octaves = other.octaves;
+            persistence = other.persistence;
+            lacunarity = other.lacunarity;
+        }
     };
 
+    struct PerlinSamplerState
+    {
+        public Vector2[] octaveOffsets;
+        public float maxHeight;
+    }
+
+    public static float samplePerlinNoise(float x, float y, PerlinSettings ps)
+    {
+        return samplePerlinNoise(x, y, ps.offset, ps.scale, ps.octaves, ps.persistence, ps.lacunarity);
+    }
+
+    public static float samplePerlinNoise(float x, float y, Vector2 offset, float scale, int octaves, float persistance, float lacunarity)
+    {
+        float maxHeight = 0.0f;
+        float amplitude = 1.0f;
+        float frequency = 1.0f;
+
+        Vector2[] octaveOffsets = new Vector2[octaves];
+
+        for (int i = 0; i < octaves; i++)
+        {
+            float offsetX = Random.Range(-10000.0f, 10000.0f) + offset.x;
+            float offsetY = Random.Range(-10000.0f, 10000.0f) + offset.y;
+            octaveOffsets[i] = new Vector2(offsetX, offsetY);
+
+            maxHeight += amplitude;
+            amplitude *= persistance;
+        }
+
+        amplitude = 1;
+        frequency = 1;
+        float noiseHeight = 0;
+
+        for(int i = 0; i < octaves; i++)
+        {
+            float sampleX = (x + octaveOffsets[i].x) / scale * frequency;
+            float sampleY = (y + octaveOffsets[i].y) / scale * frequency;
+
+            float perlinValue = Mathf.PerlinNoise(sampleX, sampleY) * 2.0f - 1.0f;
+            noiseHeight += perlinValue * amplitude;
+
+            amplitude *= persistance;
+            frequency *= lacunarity;
+        }
+
+        return (noiseHeight + 1.0f) / (2.0f * maxHeight / 1.75f);
+    }
+    
     public static float[,] perlinNoise(int width, int height, PerlinSettings ps)
     {
         return perlinNoise(width, height, ps.offset, ps.scale, ps.octaves, ps.persistence, ps.lacunarity);
@@ -77,7 +135,15 @@ public static class Noise
         return perlinNoise;
     }
     
-    
+    public static float sampleSphere(Vector3 pos, Vector3 mid)
+    {
+        return Vector3.Distance(pos, mid);
+    }
+
+    public static float sampleSphere(Vector3 pos, List<Vector3> mids)
+    {
+        return mids.Min((mid) => Vector3.Distance(pos, mid));
+    }
 
     // //Perlin noise with step
     // public static Color[,] generatePerlinNoiseIsland(int width, int height, int seed, Vector2 offset, float scale, int octaves, float persistance, float lacunarity, float limit1, float limit2)
