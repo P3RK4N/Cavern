@@ -151,7 +151,7 @@ public class EnemyMovement : MonoBehaviour
     */
     void detection()
     {
-        int layer = Layer.s_Instance.m_FoodMask | Layer.s_Instance.m_PlayerMask | Layer.s_Instance.m_NestMask;
+        int layer = Layer.s_Instance.m_FoodMask | Layer.s_Instance.m_PlayerMask | Layer.s_Instance.m_NestMask | Layer.s_Instance.m_ObstacleMask;
 
 #if UNITY_EDITOR
         DebugExtension.DebugArrow(r_TF.position, r_TF.forward * f_DetectionDistance, Color.white, 0.1f);
@@ -164,7 +164,7 @@ public class EnemyMovement : MonoBehaviour
             int hitLayer = hit.collider.gameObject.layer;
             Transform tf = hit.collider.transform;
             
-            if(hitLayer == Layer.s_Instance.m_FoodLayer)
+            if(hitLayer == Layer.s_Instance.m_FoodLayer) // Food
             {
                 #if UNITY_EDITOR 
                     Debug.Log("FoodDetected");
@@ -174,7 +174,7 @@ public class EnemyMovement : MonoBehaviour
                 if(m_TargetPrey != null || m_TargetFood != null) return; //Maybe add if returning to return too; redundant?
                 m_TargetFood = tf;
             }
-            else if(hitLayer == Layer.s_Instance.m_PlayerLayer)
+            else if(hitLayer == Layer.s_Instance.m_PlayerLayer) // Player
             {
                 #if UNITY_EDITOR 
                     Debug.Log("PlayerDetected");
@@ -195,7 +195,7 @@ public class EnemyMovement : MonoBehaviour
                 m_TargetNest = null;
                 m_TargetPrey = tf;
             }
-            else //Nest
+            else if(hitLayer == Layer.s_Instance.m_NestLayer) //Nest
             {
                 #if UNITY_EDITOR 
                     Debug.Log("NestDetected");

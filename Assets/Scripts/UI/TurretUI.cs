@@ -106,8 +106,13 @@ public class TurretUI : MonoBehaviour, IDragHandler, IEndDragHandler, IBeginDrag
 
     public void OnDrag(PointerEventData ped)
     {
+        Debug.Log(r_CAM.ScreenToViewportPoint(Input.mousePosition));
+
         int rayMask = Layer.s_Instance.m_GroundMask;
-        Ray ray = r_CAM.ScreenPointToRay(Input.mousePosition);
+
+        Vector3 normalizedMousePos = new Vector3(Input.mousePosition.x / Screen.width, Input.mousePosition.y / Screen.height, 1.0f);
+        Ray ray = r_CAM.ViewportPointToRay(normalizedMousePos);
+
         RaycastHit hit;
         if (Physics.Raycast(ray, out hit, 50.0f, rayMask))
         {
