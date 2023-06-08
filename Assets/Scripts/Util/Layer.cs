@@ -2,6 +2,10 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
+#if UNITY_EDITOR
+using UnityEditor;
+[ExecuteAlways]
+#endif
 public class Layer : MonoBehaviour
 {
     public static Layer s_Instance;

@@ -82,7 +82,6 @@ public static class Noise
         return perlinNoise(width, height, ps.offset, ps.scale, ps.octaves, ps.persistence, ps.lacunarity);
     }
 
-    //Perlin noise
     public static float[,] perlinNoise(int width, int height, Vector2 offset, float scale, int octaves, float persistance, float lacunarity)
     {
         float[,] perlinNoise = new float[width,height];
@@ -135,14 +134,63 @@ public static class Noise
         return perlinNoise;
     }
     
-    public static float sampleSphere(Vector3 pos, Vector3 mid)
+    public static float[,] perlinNoise(float size, int subdivisions, PerlinSettings ps)
     {
-        return Vector3.Distance(pos, mid);
+        return perlinNoise(size, subdivisions, ps.offset, ps.scale, ps.octaves, ps.persistence, ps.lacunarity);
     }
 
-    public static float sampleSphere(Vector3 pos, List<Vector3> mids)
+    public static float[,] perlinNoise(float size, int subdivisions, Vector2 offset, float scale, int octaves, float persistence, float lacunarity)
     {
-        return mids.Min((mid) => Vector3.Distance(pos, mid));
+        float step = size / subdivisions;
+        float halfSize = size / 2.0f;
+
+        float maxHeight = 0.0f;
+        float amplitude = 1.0f;
+        float frequency = 1.0f;
+
+        Vector2[] octaveOffsets = new Vector2[octaves];
+
+        for(int octave = 0; octave < octaves; octave++)
+        {
+            float offsetX = Random.Range(-10000.0f, 10000.0f) + offset.x;
+            float offsetY = Random.Range(-10000.0f, 10000.0f) + offset.y;
+            octaveOffsets[octave] = new Vector2(offsetX, offsetY);
+
+            maxHeight += amplitude;
+            amplitude *= persistence;
+        }
+
+        float[,] perlinNoise = new float[subdivisions+1,subdivisions+1];
+
+        int i = -1, j = -1;
+        for(float x = -halfSize; x <= halfSize + Mathf.Epsilon; x += step)
+        {
+            i++;
+            j = -1;
+            for(float y = -halfSize; y <= halfSize + Mathf.Epsilon; y += step)
+            {
+                j++;
+                amplitude = 1;
+                frequency = 1;
+                float noiseHeight = 0;
+
+                for(int octave = 0; octave < octaves; octave++)
+                {
+                    float sampleX = (x + octaveOffsets[octave].x) / scale * frequency;
+                    float sampleY = (y + octaveOffsets[octave].y) / scale * frequency;
+
+                    float perlinValue = Mathf.PerlinNoise(sampleX, sampleY) * 2.0f - 1.0f;
+                    noiseHeight += perlinValue * amplitude;
+
+                    amplitude *= persistence;
+                    frequency *= lacunarity;
+                }
+
+                perlinNoise[i,j] = (noiseHeight + 1.0f) / (2.0f * maxHeight / 1.75f);
+            }
+        }
+
+        return perlinNoise;
     }
 
     // //Perlin noise with step

@@ -35,7 +35,7 @@ public class TextureViewerEditor : Editor
             generateTex();
             texView.refresh();
 
-            FindObjectOfType<FloorGenerator>().createMarchingEnvironment();
+            FindObjectOfType<FloorGenerator>().createCaveWall();
         }
 
         EditorPrefs.SetInt("genType" + texView.GetInstanceID(), genType);

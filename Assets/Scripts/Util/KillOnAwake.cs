@@ -4,8 +4,11 @@ using UnityEngine;
 
 public class KillOnAwake : MonoBehaviour
 {
+    [SerializeField]
+    bool f_Enabled = false;
+
     void Awake()
     {
-        Destroy(gameObject);
+        if(f_Enabled) Destroy(gameObject);
     }
 }

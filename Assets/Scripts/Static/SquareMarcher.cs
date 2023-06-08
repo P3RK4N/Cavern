@@ -334,9 +334,13 @@ public static class SquareMarcher
         caveTop.SetVertices(topVertices);
         caveTop.SetIndices(topIndices, MeshTopology.Triangles, 0);
         caveTop.SetUVs(0, topUVs);
+        caveTop.RecalculateBounds();
+        caveTop.RecalculateNormals();
 
         caveWall.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
         caveWall.SetVertices(wallVertices);
         caveWall.SetIndices(wallIndices, MeshTopology.Triangles, 0);
+        caveWall.RecalculateBounds();
+        caveWall.RecalculateNormals();
     }
 }
