@@ -29,7 +29,14 @@ public static class TerrainGenerator
 
     // }
 
-    public static Mesh s_CreateNoisyTerrain(float size, int subdivisions, Noise.PerlinSettings ps, float intensity = 1.0f)
+    // TODO: Too much vertices generated !!!!
+    // 1. Approach: Brute force
+    // 2. Approach: Segmentation to multiple meshes
+    // 3. Approach: Generate small mesh each frame
+    // 4. Approach: Generate low resolution whole terrain + tess
+    // 5. Approach: combination of 3. and 4. 
+        // 10x10 plane around player with tessellation!!!
+    public static Mesh s_CreateNoisyTerrain(float size, int subdivisions, Noise.PerlinSettings ps, float amplitudeFac = 1.0f, bool flatShaded = true)
     {
         // Mesh --------------
         Mesh terrain = new Mesh();
@@ -37,7 +44,7 @@ public static class TerrainGenerator
         // Mesh --------------
 
         // Noise Map ---------
-        float[,] perlinNoise = Noise.perlinNoise(size, subdivisions, ps);
+        float[,] perlinNoise = Noise.perlinNoise2x1(size, subdivisions, ps);
         // Noise Map ---------
 
         // Vertices ----------
@@ -54,11 +61,10 @@ public static class TerrainGenerator
                 j++;
                 Vector3 vertex = new Vector3(x, perlinNoise[i,j], y);
                 vertex.y -= 0.5f;
-                vertex.y *= intensity;
+                vertex.y *= amplitudeFac;
                 terrainVertices.Add(vertex);
             }
         }
-        terrain.SetVertices(terrainVertices);
         // Vertices ----------
 
         // Indices -----------
@@ -75,8 +81,21 @@ public static class TerrainGenerator
                 terrainIndices[k++] = (subdivisions+1)*(i-1) + j + 1;
                 terrainIndices[k++] = (subdivisions+1)*i + j + 1;
             }
-        terrain.SetIndices(terrainIndices, MeshTopology.Triangles, 0);
         // Indices -----------
+
+        if(flatShaded)
+        {
+            Vector3[] newVertices = MeshUtil.s_IndicesToVertices(terrainIndices, terrainVertices);
+            int[] newIndices = new int[newVertices.Length];
+            for(i = 0; i < newIndices.Length; i++) newIndices[i] = i;
+            terrain.SetVertices(newVertices);
+            terrain.SetIndices(newIndices, MeshTopology.Triangles, 0);
+        }
+        else
+        {
+            terrain.SetVertices(terrainVertices);
+            terrain.SetIndices(terrainIndices, MeshTopology.Triangles, 0);
+        }
 
         terrain.RecalculateBounds();
         terrain.RecalculateNormals();

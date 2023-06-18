@@ -167,7 +167,7 @@ public class EnemyMovement : MonoBehaviour
             if(hitLayer == Layer.s_Instance.m_FoodLayer) // Food
             {
                 #if UNITY_EDITOR 
-                    Debug.Log("FoodDetected");
+                    // Debug.Log("FoodDetected");
                 #endif
 
                 //Either fighting, running away, collecting, carrying, storing
@@ -177,7 +177,7 @@ public class EnemyMovement : MonoBehaviour
             else if(hitLayer == Layer.s_Instance.m_PlayerLayer) // Player
             {
                 #if UNITY_EDITOR 
-                    Debug.Log("PlayerDetected");
+                    // Debug.Log("PlayerDetected");
                 #endif
                 
                 //Either already fights or runs away from enemy
@@ -198,7 +198,7 @@ public class EnemyMovement : MonoBehaviour
             else if(hitLayer == Layer.s_Instance.m_NestLayer) //Nest
             {
                 #if UNITY_EDITOR 
-                    Debug.Log("NestDetected");
+                    // Debug.Log("NestDetected");
                 #endif
                 
                 //Ignore if not returning

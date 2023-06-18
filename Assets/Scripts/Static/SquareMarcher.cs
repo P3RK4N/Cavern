@@ -15,14 +15,14 @@ public static class SquareMarcher
     static Vector3 L  = new Vector3(-1.0f, 0.0f, 0.0f);
     static Vector3 R  = new Vector3(1.0f, 0.0f, 0.0f);
 
-    static Vector3 dTL = new Vector3(-1.0f, -10.0f, 1.0f);
-    static Vector3 dTR = new Vector3(1.0f, -10.0f, 1.0f);
-    static Vector3 dBL = new Vector3(-1.0f, -10.0f, -1.0f);
-    static Vector3 dBR = new Vector3(1.0f, -10.0f, -1.0f);
-    static Vector3 dT  = new Vector3(0.0f, -10.0f, 1.0f);
-    static Vector3 dB  = new Vector3(0.0f, -10.0f, -1.0f);
-    static Vector3 dL  = new Vector3(-1.0f, -10.0f, 0.0f);
-    static Vector3 dR  = new Vector3(1.0f, -10.0f, 0.0f);
+    static Vector3 dTL = new Vector3(-1.0f, -1.0f, 1.0f);
+    static Vector3 dTR = new Vector3(1.0f, -1.0f, 1.0f);
+    static Vector3 dBL = new Vector3(-1.0f, -1.0f, -1.0f);
+    static Vector3 dBR = new Vector3(1.0f, -1.0f, -1.0f);
+    static Vector3 dT  = new Vector3(0.0f, -1.0f, 1.0f);
+    static Vector3 dB  = new Vector3(0.0f, -1.0f, -1.0f);
+    static Vector3 dL  = new Vector3(-1.0f, -1.0f, 0.0f);
+    static Vector3 dR  = new Vector3(1.0f, -1.0f, 0.0f);
 
     /*
     *   2----3
@@ -153,7 +153,7 @@ public static class SquareMarcher
         },
     };
 
-    static readonly Vector3[][] s_Byte2Vertices = new Vector3[][]
+    static readonly Vector3[][] s_Byte2TopVertices = new Vector3[][]
     {
         // 0b0000
         new Vector3[]
@@ -268,18 +268,23 @@ public static class SquareMarcher
     };
 
 
+    static readonly Vector3 m_OffsetVec0 = new Vector3(-0.5f, -0.5f, -0.5f);
     static Vector3 m_Offset = Vector3.zero;
+    static Vector3[] m_TmpTriangle = new Vector3[3];
 
-    public static void s_CreateCave(float size, int subdivisions, Func<float, float, int> filter, out Mesh caveTop, out Mesh caveWall)
+    public static void s_CreateCave(CaveSpec cs, out Mesh caveTop, out Mesh caveWall)
     {
+        Func<float, float, int> filter = (x,y) => Noise.samplePerlinNoise2x1(x, y, cs.wallPerlinSettings) > cs.perlinThreshold ? 0 : 1;
+        Func<float, float> calc = (x) => cs.wallQuadraticDisplacement.x * Mathf.Pow(x-cs.wallQuadraticDisplacement.y, 2.0f) + cs.wallQuadraticDisplacement.z;
+
         caveTop = new Mesh();
         caveWall = new Mesh();
 
         List<Vector3> topVertices = new List<Vector3>();
         List<Vector3> wallVertices = new List<Vector3>();
 
-        float step = size / subdivisions;
-        float halfSize = size / 2.0f;
+        float step = cs.size / cs.wallResolution;
+        float halfSize = cs.size / 2.0f;
         float halfStep = step / 2.0f;
         float half3Step = halfStep * 3.0f;
 
@@ -296,22 +301,82 @@ public static class SquareMarcher
                 m_Offset.x = x;
                 m_Offset.z = y;
 
-                // Top Vertices
-                for(int i = 0; i < s_Byte2Vertices[index].Length; i += 3)
+                // Top Vertices -> Making Grid
+                for(int i = 0; i < s_Byte2TopVertices[index].Length; i += 3)
                 {
-                    topVertices.Add(s_Byte2Vertices[index][i] * halfStep + m_Offset);
-                    topVertices.Add(s_Byte2Vertices[index][i+1] * halfStep + m_Offset);
-                    topVertices.Add(s_Byte2Vertices[index][i+2] * halfStep + m_Offset);
+                    // Vertex transforms
+                    m_TmpTriangle[0] = s_Byte2TopVertices[index][i] * halfStep + m_Offset;
+                    m_TmpTriangle[1] = s_Byte2TopVertices[index][i+1] * halfStep + m_Offset;
+                    m_TmpTriangle[2] = s_Byte2TopVertices[index][i+2] * halfStep + m_Offset;
+
+                    // Height
+                    m_TmpTriangle[0].y = (cs.wallVerticalSegments - 1) * cs.wallHeight / cs.wallVerticalSegments;
+                    m_TmpTriangle[1].y = (cs.wallVerticalSegments - 1) * cs.wallHeight / cs.wallVerticalSegments;
+                    m_TmpTriangle[2].y = (cs.wallVerticalSegments - 1) * cs.wallHeight / cs.wallVerticalSegments;
+
+                    // Gradients / directions
+                    Vector3 dir0 = Noise.samplePerlinDirection(m_TmpTriangle[0].x, m_TmpTriangle[0].z, cs.wallPerlinSettings);
+                    Vector3 dir1 = Noise.samplePerlinDirection(m_TmpTriangle[1].x, m_TmpTriangle[1].z, cs.wallPerlinSettings);
+                    Vector3 dir2 = Noise.samplePerlinDirection(m_TmpTriangle[2].x, m_TmpTriangle[2].z, cs.wallPerlinSettings);
+                    
+                    // Adding function offset
+                    m_TmpTriangle[0] += calc(m_TmpTriangle[0].y) * dir0;
+                    m_TmpTriangle[1] += calc(m_TmpTriangle[1].y) * dir1;
+                    m_TmpTriangle[2] += calc(m_TmpTriangle[2].y) * dir2;
+
+                    // Adding noise displacement
+                    m_TmpTriangle[0] += Mathf.Pow(m_TmpTriangle[0].y / cs.wallHeight, cs.wallNoiseFalloff) * cs.wallNoiseIntensity * dir0 * Noise.samplePerlinNoise3x1(m_TmpTriangle[0].x, m_TmpTriangle[0].y, m_TmpTriangle[0].z, cs.wallNoiseDisplacementPerlinSettings);
+                    m_TmpTriangle[1] += Mathf.Pow(m_TmpTriangle[1].y / cs.wallHeight, cs.wallNoiseFalloff) * cs.wallNoiseIntensity * dir1 * Noise.samplePerlinNoise3x1(m_TmpTriangle[1].x, m_TmpTriangle[1].y, m_TmpTriangle[1].z, cs.wallNoiseDisplacementPerlinSettings);
+                    m_TmpTriangle[2] += Mathf.Pow(m_TmpTriangle[2].y / cs.wallHeight, cs.wallNoiseFalloff) * cs.wallNoiseIntensity * dir2 * Noise.samplePerlinNoise3x1(m_TmpTriangle[2].x, m_TmpTriangle[2].y, m_TmpTriangle[2].z, cs.wallNoiseDisplacementPerlinSettings);
+                    
+                    // Appending to a caveTop mesh
+                    topVertices.Add(m_TmpTriangle[0]);
+                    topVertices.Add(m_TmpTriangle[1]);
+                    topVertices.Add(m_TmpTriangle[2]);
                 }
 
                 // Wall vertices
-                for(int i = 0; i < s_Byte2WallVertices[index].Length; i += 3)
+                for(int wallSegment = 0; wallSegment < cs.wallVerticalSegments - 1 /* TODO: Remove */; wallSegment++)
                 {
-                    wallVertices.Add(s_Byte2WallVertices[index][i] * halfStep + m_Offset);
-                    wallVertices.Add(s_Byte2WallVertices[index][i+1] * halfStep + m_Offset);
-                    wallVertices.Add(s_Byte2WallVertices[index][i+2] * halfStep + m_Offset);
+                    float up = (cs.wallHeight / cs.wallVerticalSegments) * (wallSegment + 1);
+                    float down = (cs.wallHeight / cs.wallVerticalSegments) * wallSegment;
+
+                    for(int i = 0; i < s_Byte2WallVertices[index].Length; i += 3)
+                    {
+                        // Vertex transforms
+                        m_TmpTriangle[0] = s_Byte2WallVertices[index][i] * halfStep + m_Offset;
+                        m_TmpTriangle[1] = s_Byte2WallVertices[index][i+1] * halfStep + m_Offset;
+                        m_TmpTriangle[2] = s_Byte2WallVertices[index][i+2] * halfStep + m_Offset;
+
+                        // Vertices without noise and added function
+                        m_TmpTriangle[0].y = m_TmpTriangle[0].y == 0.0f ? up : down;
+                        m_TmpTriangle[1].y = m_TmpTriangle[1].y == 0.0f ? up : down;
+                        m_TmpTriangle[2].y = m_TmpTriangle[2].y == 0.0f ? up : down;
+
+                        // Gradients / directions
+                        Vector3 dir0 = Noise.samplePerlinDirection(m_TmpTriangle[0].x, m_TmpTriangle[0].z, cs.wallPerlinSettings);
+                        Vector3 dir1 = Noise.samplePerlinDirection(m_TmpTriangle[1].x, m_TmpTriangle[1].z, cs.wallPerlinSettings);
+                        Vector3 dir2 = Noise.samplePerlinDirection(m_TmpTriangle[2].x, m_TmpTriangle[2].z, cs.wallPerlinSettings);
+
+                        // Adding function offset
+                        m_TmpTriangle[0] += calc(m_TmpTriangle[0].y) * dir0;
+                        m_TmpTriangle[1] += calc(m_TmpTriangle[1].y) * dir1;
+                        m_TmpTriangle[2] += calc(m_TmpTriangle[2].y) * dir2;
+                        
+                        // Adding noise displacement
+                        m_TmpTriangle[0] += Mathf.Pow(m_TmpTriangle[0].y / cs.wallHeight, cs.wallNoiseFalloff) * cs.wallNoiseIntensity * dir0 * Noise.samplePerlinNoise3x1(m_TmpTriangle[0].x, m_TmpTriangle[0].y, m_TmpTriangle[0].z, cs.wallNoiseDisplacementPerlinSettings);
+                        m_TmpTriangle[1] += Mathf.Pow(m_TmpTriangle[1].y / cs.wallHeight, cs.wallNoiseFalloff) * cs.wallNoiseIntensity * dir1 * Noise.samplePerlinNoise3x1(m_TmpTriangle[1].x, m_TmpTriangle[1].y, m_TmpTriangle[1].z, cs.wallNoiseDisplacementPerlinSettings);
+                        m_TmpTriangle[2] += Mathf.Pow(m_TmpTriangle[2].y / cs.wallHeight, cs.wallNoiseFalloff) * cs.wallNoiseIntensity * dir2 * Noise.samplePerlinNoise3x1(m_TmpTriangle[2].x, m_TmpTriangle[2].y, m_TmpTriangle[2].z, cs.wallNoiseDisplacementPerlinSettings);
+
+                        // Appending to a cave wall
+                        wallVertices.Add(m_TmpTriangle[0]);
+                        wallVertices.Add(m_TmpTriangle[1]);
+                        wallVertices.Add(m_TmpTriangle[2]);
+                    }
                 }
             }
+
+        // Setting UVs, Indices
 
         int[] topIndices = new int[topVertices.Count];
         int[] wallIndices = new int[wallVertices.Count];
@@ -340,7 +405,7 @@ public static class SquareMarcher
         caveWall.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
         caveWall.SetVertices(wallVertices);
         caveWall.SetIndices(wallIndices, MeshTopology.Triangles, 0);
-        caveWall.RecalculateBounds();
         caveWall.RecalculateNormals();
+        caveWall.RecalculateBounds();
     }
 }

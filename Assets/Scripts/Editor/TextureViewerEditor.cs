@@ -35,7 +35,7 @@ public class TextureViewerEditor : Editor
             generateTex();
             texView.refresh();
 
-            FindObjectOfType<FloorGenerator>().createCaveWall();
+            // FindObjectOfType<FloorGenerator>().createCaveWall();
         }
 
         EditorPrefs.SetInt("genType" + texView.GetInstanceID(), genType);
@@ -90,7 +90,7 @@ public class TextureViewerEditor : Editor
             {
                 if(texView.seed != 0) Random.InitState(texView.seed);
                 posToPerlinOffset(ref texView.perlinSettings, texView.perlinOffset);
-                float[,] perlinNoise = Noise.perlinNoise(texView.textureSize.x, texView.textureSize.y, texView.perlinSettings);
+                float[,] perlinNoise = Noise.perlinNoise2x1(texView.textureSize.x, texView.textureSize.y, texView.perlinSettings);
                 Filter.binarize(perlinNoise, texView.perlinTreshold, 0.0f, 1.0f);
                 texView.m_Texture = Array2Tex.Tex(perlinNoise);
                 texView.refresh();

@@ -9,7 +9,7 @@ public static class Noise
     public struct PerlinSettings
     {
         [SerializeField]
-        public Vector2 offset;
+        public Vector3 offset;
         [SerializeField]
         public float scale;
         [SerializeField]
@@ -27,21 +27,37 @@ public static class Noise
             persistence = other.persistence;
             lacunarity = other.lacunarity;
         }
+
+        public PerlinSettings(Vector3 offset, float scale, int octaves, float persistence, float lacunarity)
+        {
+            this.offset = offset;
+            this.scale = scale;
+            this.octaves = octaves;
+            this.persistence = persistence;
+            this.lacunarity = lacunarity;
+        }
     };
 
+    public static int s_PerlinSeed = 0;
+
+    // TODO: Implement or remove
     struct PerlinSamplerState
     {
         public Vector2[] octaveOffsets;
         public float maxHeight;
     }
 
-    public static float samplePerlinNoise(float x, float y, PerlinSettings ps)
+    // Perlin noise with sampling one value
+
+    public static float samplePerlinNoise2x1(float x, float y, PerlinSettings ps)
     {
-        return samplePerlinNoise(x, y, ps.offset, ps.scale, ps.octaves, ps.persistence, ps.lacunarity);
+        return samplePerlinNoise2x1(x, y, ps.offset, ps.scale, ps.octaves, ps.persistence, ps.lacunarity);
     }
 
-    public static float samplePerlinNoise(float x, float y, Vector2 offset, float scale, int octaves, float persistance, float lacunarity)
+    public static float samplePerlinNoise2x1(float x, float y, Vector2 offset, float scale, int octaves, float persistance, float lacunarity)
     {
+        Random.InitState(s_PerlinSeed);
+
         float maxHeight = 0.0f;
         float amplitude = 1.0f;
         float frequency = 1.0f;
@@ -77,13 +93,137 @@ public static class Noise
         return (noiseHeight + 1.0f) / (2.0f * maxHeight / 1.75f);
     }
     
-    public static float[,] perlinNoise(int width, int height, PerlinSettings ps)
+    public static float samplePerlinNoise3x1(float x, float y, float z, PerlinSettings ps)
     {
-        return perlinNoise(width, height, ps.offset, ps.scale, ps.octaves, ps.persistence, ps.lacunarity);
+        return samplePerlinNoise3x1(x, y, z, ps.offset, ps.scale, ps.octaves, ps.persistence, ps.lacunarity);
     }
 
-    public static float[,] perlinNoise(int width, int height, Vector2 offset, float scale, int octaves, float persistance, float lacunarity)
+    public static float samplePerlinNoise3x1(float x, float y, float z, Vector3 offset, float scale, int octaves, float persistance, float lacunarity)
     {
+        if(NoiseS3D.seed != Noise.s_PerlinSeed) NoiseS3D.seed = Noise.s_PerlinSeed;
+        Random.InitState(s_PerlinSeed);
+
+        float maxHeight = 0.0f;
+        float amplitude = 1.0f;
+        float frequency = 1.0f;
+
+        Vector3[] octaveOffsets = new Vector3[octaves];
+
+        for (int i = 0; i < octaves; i++)
+        {
+            float offsetX = Random.Range(-10000.0f, 10000.0f) + offset.x;
+            float offsetY = Random.Range(-10000.0f, 10000.0f) + offset.y;
+            float offsetZ = Random.Range(-10000.0f, 10000.0f) + offset.z;
+            octaveOffsets[i] = new Vector3(offsetX, offsetY, offsetZ);
+
+            maxHeight += amplitude;
+            amplitude *= persistance;
+        }
+
+        amplitude = 1;
+        frequency = 1;
+        float noiseHeight = 0;
+
+        for(int i = 0; i < octaves; i++)
+        {
+            float sampleX = (x + octaveOffsets[i].x) / scale * frequency;
+            float sampleY = (y + octaveOffsets[i].y) / scale * frequency;
+            float sampleZ = (y + octaveOffsets[i].z) / scale * frequency;
+
+            float perlinValue = (float)NoiseS3D.Noise(sampleX, sampleY, sampleZ);
+            noiseHeight += perlinValue * amplitude;
+
+            amplitude *= persistance;
+            frequency *= lacunarity;
+        }
+
+        return (noiseHeight + 1.0f) / (2.0f * maxHeight / 1.75f);
+    }
+
+    public static Vector3 samplePerlinNoise3x3(float x, float y, float z, PerlinSettings ps)
+    {
+        return samplePerlinNoise3x3(x, y, z, ps.offset, ps.scale, ps.octaves, ps.persistence, ps.lacunarity);
+    }
+
+    public static Vector3 samplePerlinNoise3x3(float x, float y, float z, Vector3 offset, float scale, int octaves, float persistence, float lacunarity)
+    {
+        if(s_PerlinSeed != NoiseS3D.seed) NoiseS3D.seed = s_PerlinSeed;
+        Random.InitState(s_PerlinSeed);
+
+        float[] maxHeight = new float[3] { 0.0f, 0.0f, 0.0f };
+        float[] amplitude = new float[3] { 1.0f, 1.0f, 1.0f };
+        float[] frequency = new float[3] { 1.0f, 1.0f, 1.0f };
+
+        Vector3[,] octaveOffsets = new Vector3[3,octaves];
+
+        for(int dim = 0; dim < 3; dim++)
+        {
+            for(int octave = 0; octave < octaves; octave++)
+            {
+                float offsetX = Random.Range(-10000.0f, 10000.0f) + offset.x;
+                float offsetY = Random.Range(-10000.0f, 10000.0f) + offset.y;
+                float offsetZ = Random.Range(-10000.0f, 10000.0f) + offset.z;
+                octaveOffsets[dim, octave] = new Vector3(offsetX, offsetY, offsetZ);
+
+                maxHeight[dim] += amplitude[dim];
+                amplitude[dim] *= persistence;
+            }
+        }
+
+        Vector3 noise = Vector3.zero;
+
+        for(int dim = 0; dim < 3; dim++)
+        {
+            amplitude[dim] = 1;
+            frequency[dim] = 1;
+            float noiseHeight = 0;
+
+            for(int octave = 0; octave < octaves; octave++)
+            {
+                float sampleX = (x + octaveOffsets[dim, octave].x) / scale * frequency[dim];
+                float sampleY = (y + octaveOffsets[dim, octave].y) / scale * frequency[dim];
+                float sampleZ = (z + octaveOffsets[dim, octave].z) / scale * frequency[dim];
+                
+                float perlinValue = (float)NoiseS3D.Noise(sampleX, sampleY, sampleZ);
+                noiseHeight += perlinValue * amplitude[dim];
+
+                amplitude[dim] *= persistence;
+                frequency[dim] *= lacunarity;
+            }
+
+            noise[dim] = (noiseHeight + 1.0f) / (2.0f * maxHeight[dim] / 1.75f);
+        }
+
+        return noise;
+    }
+
+    // Direction approximation of perline noise from sampled position
+
+    public static Vector3 samplePerlinDirection(float x, float y, PerlinSettings ps)
+    {
+        Vector3 normal = Vector3.zero;
+
+        float val = samplePerlinNoise2x1(x, y, ps);
+        float valX = samplePerlinNoise2x1(x+0.01f, y, ps);
+        float valY = samplePerlinNoise2x1(x, y+0.01f, ps);
+
+        normal.x = valX - val;
+        normal.z = valY - val;
+
+        return normal.normalized;
+    }
+
+    // Perlin noise with width and height
+
+    public static float[,] perlinNoise2x1(int width, int height, PerlinSettings ps)
+    {
+        return perlinNoise2x1(width, height, ps.offset, ps.scale, ps.octaves, ps.persistence, ps.lacunarity);
+    }
+
+    public static float[,] perlinNoise2x1(int width, int height, Vector2 offset, float scale, int octaves, float persistance, float lacunarity)
+    {
+        Random.InitState(s_PerlinSeed);
+
         float[,] perlinNoise = new float[width,height];
 
         float maxHeight = 0.0f;
@@ -134,13 +274,17 @@ public static class Noise
         return perlinNoise;
     }
     
-    public static float[,] perlinNoise(float size, int subdivisions, PerlinSettings ps)
+    // Perlin noise with size
+
+    public static float[,] perlinNoise2x1(float size, int subdivisions, PerlinSettings ps)
     {
-        return perlinNoise(size, subdivisions, ps.offset, ps.scale, ps.octaves, ps.persistence, ps.lacunarity);
+        return perlinNoise2x1(size, subdivisions, ps.offset, ps.scale, ps.octaves, ps.persistence, ps.lacunarity);
     }
 
-    public static float[,] perlinNoise(float size, int subdivisions, Vector2 offset, float scale, int octaves, float persistence, float lacunarity)
+    public static float[,] perlinNoise2x1(float size, int subdivisions, Vector2 offset, float scale, int octaves, float persistence, float lacunarity)
     {
+        Random.InitState(s_PerlinSeed);
+
         float step = size / subdivisions;
         float halfSize = size / 2.0f;
 
@@ -178,7 +322,7 @@ public static class Noise
                 {
                     float sampleX = (x + octaveOffsets[octave].x) / scale * frequency;
                     float sampleY = (y + octaveOffsets[octave].y) / scale * frequency;
-
+                    
                     float perlinValue = Mathf.PerlinNoise(sampleX, sampleY) * 2.0f - 1.0f;
                     noiseHeight += perlinValue * amplitude;
 

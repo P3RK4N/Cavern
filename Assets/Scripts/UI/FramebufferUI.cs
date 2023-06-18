@@ -5,7 +5,7 @@ using UnityEngine.UI;
 
 public class FramebufferUI : MonoBehaviour
 {
-    public float f_ResolutionFactor = 0.2f;
+    public float f_ResolutionFactor = 0.4f;
 
     public RawImage r_RI;
     public RenderTexture r_RT;
@@ -36,6 +36,10 @@ public class FramebufferUI : MonoBehaviour
         r_RT.height = (int)(m_Height * f_ResolutionFactor);
         r_RT.Create();
 
+        Camera.main.ResetAspect();
+
+#if UNITY_EDITOR
         Debug.Log(string.Format("Recreated: {0} {1}", r_RT.width, r_RT.height));        
+#endif
     }
 }

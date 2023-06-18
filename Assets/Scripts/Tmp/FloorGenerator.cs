@@ -8,22 +8,104 @@ using UnityEditor;
 
 #endif
 
+[System.Serializable]
+public struct CaveSpec
+{
+    [Header("General")]
+
+    [SerializeField]
+    public int seed;
+    [SerializeField] [Range(1.0f, 1000.0f)]
+    public float size;
+
+    [Space(5)]
+    [Header("Wall Settings")]
+
+    [SerializeField]
+    public Noise.PerlinSettings wallPerlinSettings;
+    [SerializeField]
+    public Noise.PerlinSettings wallNoiseDisplacementPerlinSettings;
+    [SerializeField]
+    public float wallNoiseIntensity;
+    [SerializeField]
+    public float wallNoiseFalloff;
+    [SerializeField]
+    public Vector3 wallQuadraticDisplacement;
+    [SerializeField] [Range(0.0f, 1.0f)]
+    public float perlinThreshold;
+    [SerializeField]
+    public int wallResolution;
+    [SerializeField]
+    public float wallHeight;
+    [SerializeField]
+    public int wallVerticalSegments;
+
+    [Space(5)]
+    [Header("Floor Settings")]
+
+    [SerializeField]
+    public Noise.PerlinSettings floorPerlinSettings;
+    [SerializeField]
+    public float floorAmplitude;
+    [SerializeField]
+    public int floorResolution;
+    [SerializeField]
+    public bool smoothFloor;
+
+    public CaveSpec(bool parameterless)
+    {
+        seed = 1;
+        size = 100;
+
+        wallPerlinSettings = new Noise.PerlinSettings
+        (
+            Vector3.zero,
+            14.34f,
+            3,
+            0.47f,
+            0.79f
+        );
+        wallNoiseDisplacementPerlinSettings = new Noise.PerlinSettings
+        (
+            Vector3.zero,
+            0.03f,
+            3,
+            0.47f,
+            0.79f
+        );
+        wallNoiseIntensity = 2.0f;
+        wallNoiseFalloff = 0.5f;
+        wallQuadraticDisplacement = new Vector3(0.13f, 2.1f, -0.4f);
+        perlinThreshold = 0.45f;
+        wallResolution = 100;
+        wallHeight = 7;
+        wallVerticalSegments = 5;
+
+        floorPerlinSettings = new Noise.PerlinSettings
+        (
+            Vector3.zero,
+            2.64f,
+            3,
+            0.47f,
+            0.79f
+        );
+        floorAmplitude = 1;
+        floorResolution = 100;
+        smoothFloor = false;
+    }
+}
+
 public class FloorGenerator : MonoBehaviour
 {
     [SerializeField]
-    int f_Seed = 0;
+    CaveSpec f_CaveSpec;
+
     [SerializeField]
-    Noise.PerlinSettings f_PerlinSettings;
+    public Material f_WallMaterial;
     [SerializeField]
-    float f_PerlinTreshold;
+    public Material f_TopMaterial;
     [SerializeField]
-    float f_FloorAmplitude = 1.0f;
-    [SerializeField]
-    GameObject cube;
-    [SerializeField]
-    Material m_CaveWallMat;
-    [SerializeField]
-    Material m_CaveFloorMat;
+    public Material f_FloorMaterial;
 
     Transform r_TF;
     NavMeshSurface r_NMS;
@@ -34,37 +116,47 @@ public class FloorGenerator : MonoBehaviour
 
     void Awake()
     {
+        Debug.Log("Awake Called!");
+
         r_NMS = GetComponentInParent<NavMeshSurface>();
         r_TF = transform;
 
-        createCaveObjects();
+        createCave();
     }
 
     void Start()
     {
-        createCaveWall();
-        createCaveFloor();
+        Debug.Log("Start Called!");
+
         r_NMS.BuildNavMesh();
     }
 
-    public void createCaveObjects()
+    public void resetCaveSpecs()
     {
-        deleteCaveObjects();
+        f_CaveSpec = new CaveSpec(true);
+    }
 
+    public void createCave()
+    {
+        Noise.s_PerlinSeed = f_CaveSpec.seed;
+
+        // Cave wall and cave top gameobject -> generated with marching squares -> SquareMarcher.s_CreateCave
         {
+            // Cave top
+            if(m_CaveTop) DestroyImmediate(m_CaveTop);
             m_CaveTop = new GameObject("CaveTop");
             m_CaveTop.transform.parent = r_TF;
-            m_CaveTop.transform.position = new Vector3(0.0f, 3.0f, 0.0f);
+            m_CaveTop.transform.position = new Vector3(0.0f, -0.5f, 0.0f);
 
             var topFilter = m_CaveTop.AddComponent<MeshFilter>();
             var topRenderer = m_CaveTop.AddComponent<MeshRenderer>();
-            topRenderer.material = m_CaveWallMat;
-        }
+            topRenderer.material = f_TopMaterial;
 
-        {
+            // Cave wall
+            if(m_CaveWall) DestroyImmediate(m_CaveWall);
             m_CaveWall = new GameObject("CaveWall");
             m_CaveWall.transform.parent = r_TF;
-            m_CaveWall.transform.position = new Vector3(0.0f, 3.0f, 0.0f);
+            m_CaveWall.transform.position = new Vector3(0.0f, -0.5f, 0.0f);
 
             // m_CaveWall.layer = Layer.s_Instance.m_ObstacleLayer;
             m_CaveWall.layer = LayerMask.NameToLayer("Obstacle");
@@ -73,87 +165,30 @@ public class FloorGenerator : MonoBehaviour
             var wallRenderer = m_CaveWall.AddComponent<MeshRenderer>();
             var meshCollider = m_CaveWall.AddComponent<MeshCollider>();
 
-            wallRenderer.material = m_CaveWallMat;
-        }
+            wallRenderer.material = f_WallMaterial;
 
+            Mesh top, wall;
+            SquareMarcher.s_CreateCave(f_CaveSpec, out top, out wall); // TODO: Add simplified mesh collider
+
+            wallFilter.mesh = wall;
+            topFilter.mesh = top;
+            meshCollider.sharedMesh = wallFilter.mesh;
+        }
+        // Cave bottom gameobject -> generated with perlin noise only -> TerrrainGenerator.s_CreateNoisyTerrain
         {
+            if(m_CaveFloor) DestroyImmediate(m_CaveFloor);
             m_CaveFloor = new GameObject("CaveFloor");
             m_CaveFloor.transform.parent = r_TF;
 
             var floorFilter = m_CaveFloor.AddComponent<MeshFilter>();
             var floorRenderer = m_CaveFloor.AddComponent<MeshRenderer>();
 
-            floorRenderer.material = m_CaveFloorMat;
+            floorRenderer.material = f_FloorMaterial;
+
+            Mesh floor  = TerrainGenerator.s_CreateNoisyTerrain(f_CaveSpec.size, f_CaveSpec.floorResolution, f_CaveSpec.floorPerlinSettings, f_CaveSpec.floorAmplitude, !f_CaveSpec.smoothFloor);
+
+            floorFilter.mesh = floor;
         }
-    }
-
-    public void deleteCaveObjects()
-    {
-        if(m_CaveFloor)
-        {
-            DestroyImmediate(m_CaveFloor);
-            m_CaveFloor = null;
-        }
-        if(m_CaveWall)
-        {
-            DestroyImmediate(m_CaveWall);
-            m_CaveWall = null;
-        }
-        if(m_CaveTop)
-        {
-            DestroyImmediate(m_CaveTop);
-            m_CaveTop = null;
-        }
-    }
-
-    public void createCaveFloor()
-    {
-        if(f_Seed != 0) Random.InitState(f_Seed);
-
-        Mesh terrain = TerrainGenerator.s_CreateNoisyTerrain(200.0f, 50, f_PerlinSettings, f_FloorAmplitude);
-
-        m_CaveFloor.GetComponent<MeshFilter>().mesh = terrain;
-    }
-
-    // void createEnvironment()
-    // {
-    //     if(r_TW.seed != 0) Random.InitState(r_TW.seed);
-
-    //     float scale = r_TW.transform.localScale.x / 10.0f;
-    //     cube.transform.localScale = new Vector3(scale,scale,scale);
-
-    //     float[,] perlinNoise = Noise.perlinNoise(r_TW.textureSize.x, r_TW.textureSize.y, r_TW.perlinSettings);
-    //     Filter.binarize(perlinNoise, r_TW.perlinTreshold, 0.0f, 1.0f);
-    //     Filter.borderize(perlinNoise, 0.0f);
-
-    //     Vector3 initPos = - new Vector3(0.5f, 0, 0.5f) + new Vector3(r_TW.textureSize.x, 0, r_TW.textureSize.y) / 2;
-    //     initPos *= scale;
-
-    //     for(int i = 0; i < perlinNoise.GetLength(0); i++)
-    //         for(int j = 0; j < perlinNoise.GetLength(1); j++)
-    //             if(perlinNoise[i,j] < 0.01f)
-    //                 Instantiate(cube, initPos + new Vector3(-j, 0.5f, -i) * scale, Quaternion.identity, r_TF);
-    // }
-
-    public void createCaveWall()
-    {
-        Mesh caveTop, caveWall;
-        SquareMarcher.s_CreateCave
-        (
-            200.0f, 
-            200, 
-            (x,y) => 
-            {
-                if(f_Seed != 0) Random.InitState(f_Seed);
-                return Noise.samplePerlinNoise(x, y, f_PerlinSettings) > f_PerlinTreshold ? 0 : 1;
-            },
-            out caveTop,
-            out caveWall
-        );
-
-        m_CaveTop.GetComponent<MeshFilter>().mesh = caveTop;
-        m_CaveWall.GetComponent<MeshFilter>().mesh = caveWall;
-        m_CaveWall.GetComponent<MeshCollider>().sharedMesh = caveWall;
     }
 }
 
@@ -162,40 +197,35 @@ public class FloorGenerator : MonoBehaviour
 [CustomEditor (typeof (FloorGenerator))]
 public class FloorGeneratorEditor : Editor
 {
+    void resetCave()
+    {
+        FloorGenerator fg = (FloorGenerator)target;
+
+        fg.resetCaveSpecs();
+    }
+
     void refreshCave()
     {
         FloorGenerator fg = (FloorGenerator)target;
 
-        fg.createCaveObjects();
-
-        fg.createCaveFloor();
-        fg.createCaveWall();
+        fg.createCave();
     }
 
     public override void OnInspectorGUI() 
     {
         FloorGenerator fg = (FloorGenerator)target;
 
-        if(GUILayout.Button("Refresh Cave")) refreshCave();
+        if(GUILayout.Button("Reset Cave")) resetCave();
 
-        GUILayout.Space(10);
-
-        if(GUILayout.Button("Refresh Wall")) fg.createCaveWall();
-        if(GUILayout.Button("Refresh Floor")) fg.createCaveFloor();
-
-        GUILayout.Space(10);
-
-        if(GUILayout.Button("Delete Cave")) fg.deleteCaveObjects();
-        if(GUILayout.Button("Create Cave"))
-        { 
-            fg.deleteCaveObjects();
-            fg.createCaveObjects();
+        if(Application.isPlaying)
+        {
+            if(GUILayout.Button("Refresh Cave")) refreshCave();
         }
 
         GUILayout.Space(20);
 
         GUILayout.Label("Settings");
-        if(DrawDefaultInspector()) 
+        if(DrawDefaultInspector() && Application.isPlaying)
         {
             refreshCave();
         }
