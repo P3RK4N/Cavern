@@ -36,22 +36,30 @@ float upLookOffset = 1.0f;
 //############################
 
     CharacterController r_CC;
+    Transform r_TF;
+    Transform r_Body;
     PlayerInput r_PI;
     Joystick r_JOY;
     Camera r_CAM;
     CinemachineFreeLook r_CFL;
+    Animator r_Animator;
     Player r_Player;
 
     Vector2 m_Movement = Vector3.zero;
     float m_CurrentStamina = 0.0f;
 
+    bool m_Running = false;
+
     void Awake()
     {
         r_Player = GetComponent<Player>();
         r_CC = GetComponent<CharacterController>();
+        r_TF = transform;
+        r_Body = transform.Find("Body");
         r_JOY = FindObjectOfType<DynamicJoystick>();
         r_CAM = FindObjectOfType<Camera>();
         r_PI = GetComponent<PlayerInput>();
+        r_Animator = GetComponentInChildren<Animator>();
         r_CFL = FindObjectOfType<CinemachineFreeLook>();
 
         m_CurrentStamina = f_Stamina;
@@ -83,6 +91,18 @@ float upLookOffset = 1.0f;
     {
         move();
         r_Player.m_Stamina.SetHealth(m_CurrentStamina);
+
+        float val = m_Movement.sqrMagnitude;
+        if(val > 0.0f && !m_Running)
+        {
+            m_Running = true;
+            r_Animator.SetTrigger("StartRun");
+        }
+        else if(val == 0.0f && m_Running)
+        {
+            m_Running = false;
+            r_Animator.SetTrigger("EndRun");
+        }
     }
 
     void MovePresed(InputAction.CallbackContext context)
@@ -115,6 +135,8 @@ float upLookOffset = 1.0f;
 
         Vector3 mov = r_CAM.transform.right * m_Movement.x + r_CAM.transform.forward * m_Movement.y;
         mov = new Vector3(mov.x, 0, mov.z).normalized * magnitude * speed;
+
+        if(mov.magnitude > 0.0f) r_Body.rotation = Quaternion.LookRotation(mov, Vector3.up);
         r_CC.SimpleMove(mov);
     }
 

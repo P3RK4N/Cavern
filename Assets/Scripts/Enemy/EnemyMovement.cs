@@ -126,6 +126,11 @@ public class EnemyMovement : MonoBehaviour
         r_Body = r_TF.Find("Parts/Body");
     }
 
+    public float moveSpeed()
+    {
+        return !r_NMA.enabled ? m_Velocity.magnitude : r_NMA.velocity.magnitude*Time.deltaTime;
+    }
+
     void Start()
     {
         StartCoroutine("senseObstacle");
@@ -499,13 +504,13 @@ public class EnemyMovement : MonoBehaviour
         m_Turning = true;
         f_SteerStrength *= 1.5f;
 
-        GetComponentInChildren<MeshRenderer>().material.color = Color.red;
+        // GetComponentInChildren<MeshRenderer>().material.color = Color.red;
         m_TurnDirection = findTurnaroudDirection();
         yield return new WaitForSeconds(f_TurnaroundTime);
 
         m_Turning = false;
         f_SteerStrength /= 1.5f;
-        GetComponentInChildren<MeshRenderer>().material.color = Color.gray;
+        // GetComponentInChildren<MeshRenderer>().material.color = Color.gray;
     }
 
     Vector2 findTurnaroudDirection(int tries = 5)

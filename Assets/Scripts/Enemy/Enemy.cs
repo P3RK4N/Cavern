@@ -10,7 +10,7 @@ public class Enemy : MonoBehaviour
     Animator r_Animator;
 
     HealthSystem m_Health;
-    bool m_Attacking = false;
+    public bool m_Attacking = false;
 
     void Awake()
     {
@@ -23,18 +23,25 @@ public class Enemy : MonoBehaviour
 
     void Update()
     {
-        tryAttack();
+        if(!tryAttack())
+        {
+
+        }
     }
 
-    void tryAttack()
+    bool tryAttack()
     {
         if
         (
             !m_Attacking && 
             r_Movement.m_TargetPrey != null && 
             Physics.CheckSphere(r_Hitbox.position, 0.7f, Layer.s_Instance.m_PlayerMask)
-        ) 
+        )
+        {
             StartCoroutine("attack");
+            return true;
+        }
+        return false;
     }
 
     WaitForSeconds wait = new WaitForSeconds(0.666f);
